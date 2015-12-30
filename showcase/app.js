@@ -1,5 +1,6 @@
 var shaderRepo = null; // global for debugging
 var environmentMap = null;
+var irradianceMap = null;
 var ShowcaseApp = (function () {
     function ShowcaseApp(params, shaderRepo) {
         var _this = this;
@@ -60,7 +61,8 @@ function StartApp() {
         };
         shaderRepo = new ShaderRepository(function (repo) { app = new ShowcaseApp(params, repo); });
         environmentMap = new CubeMap("./posx.jpg", "./negx.jpg", "./posy.jpg", "./negy.jpg", "./posz.jpg", "./negz.jpg");
-        var testScene = new Scene(environmentMap);
+        irradianceMap = new CubeMap("./irradiance_posx.jpg", "./irradiance_negx.jpg", "./irradiance_posy.jpg", "./irradiance_negy.jpg", "./irradiance_posz.jpg", "./irradiance_negz.jpg");
+        var testScene = new Scene(environmentMap, irradianceMap);
         Scene.setActiveScene(testScene);
         // sphere 1, Lambert
         testScene.addRenderable(new Sphere(1, new gml.Vec4(4, 0, 0, 1), new LambertMaterial(new gml.Vec4(0.5, 0.5, 0.5, 1))));
@@ -69,7 +71,7 @@ function StartApp() {
         // sphere 2, good old Blinn-Phong
         testScene.addRenderable(new Sphere(1, new gml.Vec4(-1.33333, 0, 0, 1), new BlinnPhongMaterial(new gml.Vec4(0, 0, 0, 1), new gml.Vec4(0.5, 0.5, 0.5, 1), new gml.Vec4(0.5, 0.5, 0.5, 1), new gml.Vec4(0, 0, 0, 1), 50)));
         // sphere 2, Cook-Torrance
-        testScene.addRenderable(new Sphere(1, new gml.Vec4(-4, 0, 0, 1), new CookTorranceMaterial(new gml.Vec4(0.5, 0.5, 0.5, 1), new gml.Vec4(0.5, 0.5, 0.5, 1), 0.5, 1.53)));
+        testScene.addRenderable(new Sphere(1, new gml.Vec4(-4, 0, 0, 1), new CookTorranceMaterial(new gml.Vec4(0.5, 0.5, 0.5, 1), new gml.Vec4(0.5, 0.5, 0.5, 1), 0.2, 1.53)));
         testScene.addLight(new PointLight(new gml.Vec4(-12, 5, -10, 1), new gml.Vec4(1.0, 1.0, 0.8, 1.0), 100));
     }
 }

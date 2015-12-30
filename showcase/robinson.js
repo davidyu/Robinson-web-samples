@@ -2450,6 +2450,8 @@ var Renderer = (function () {
         this.uInverseProjection = gl.getUniformLocation(program, "uInverseProjectionMatrix");
         this.uInverseView = gl.getUniformLocation(program, "uInverseViewMatrix");
         this.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
+        this.uEnvMap = gl.getUniformLocation(program, "environment");
+        this.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
         this.uMaterial = new ShaderMaterialProperties();
         this.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
         this.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
@@ -2527,6 +2529,9 @@ var Renderer = (function () {
         gl.vertexAttribPointer(this.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
+        gl.uniform1i(this.uEnvMap, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
@@ -2613,6 +2618,12 @@ var Renderer = (function () {
             gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexNormalBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, p.renderData.normals, gl.STATIC_DRAW);
             gl.vertexAttribPointer(_this.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
+            gl.uniform1i(_this.uEnvMap, 0);
+            gl.uniform1i(_this.uIrradianceMap, 1);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.irradiance.cubeMapTexture);
             gl.drawElements(gl.TRIANGLES, p.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
         });
     };
@@ -2643,6 +2654,21 @@ var Renderer = (function () {
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, scene.environment.faces[CUBEMAPTYPE.NEG_Z]);
                         gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
                         scene.environment.cubeMapTexture = cubeMapTexture_1;
+                    }
+                    //
+                    // SET UP IRRADIANCE MAP
+                    var irradianceTexture = null;
+                    if (scene.irradiance != null && scene.irradiance.loaded && scene.irradiance.cubeMapTexture == null) {
+                        var cubeMapTexture_2 = gl.createTexture();
+                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_2);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_X, scene.irradiance.faces[CUBEMAPTYPE.POS_X]);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, scene.irradiance.faces[CUBEMAPTYPE.NEG_X]);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, scene.irradiance.faces[CUBEMAPTYPE.POS_Y]);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, scene.irradiance.faces[CUBEMAPTYPE.NEG_Y]);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, scene.irradiance.faces[CUBEMAPTYPE.POS_Z]);
+                        this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, scene.irradiance.faces[CUBEMAPTYPE.NEG_Z]);
+                        gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+                        scene.irradiance.cubeMapTexture = cubeMapTexture_2;
                     }
                     var mvStack = [];
                     if (this.camera != null) {
@@ -2753,10 +2779,11 @@ var CubeMap = (function () {
     return CubeMap;
 })();
 var Scene = (function () {
-    function Scene(environment) {
+    function Scene(environment, irradiance) {
         this.renderables = [];
         this.lights = [];
         this.environment = environment;
+        this.irradiance = irradiance;
     }
     Scene.prototype.addRenderable = function (renderable) {
         this.renderables.push(renderable);
