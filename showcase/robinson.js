@@ -2371,6 +2371,7 @@ var Renderer = (function () {
             alert("Unable to initialize WebGL. Your browser may not support it");
             success = false;
         }
+        this.shaderLODExtension = gl.getExtension("EXT_shader_texture_lod");
         // compile phong program
         this.phongProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.BLINN_PHONG_FRAGMENT].source);
         if (this.phongProgram == null) {
@@ -2452,6 +2453,7 @@ var Renderer = (function () {
         this.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
         this.uEnvMap = gl.getUniformLocation(program, "environment");
         this.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
+        this.uEnvironmentMipMaps = gl.getUniformLocation(program, "irradianceMipMaps");
         this.uMaterial = new ShaderMaterialProperties();
         this.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
         this.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
@@ -2619,6 +2621,7 @@ var Renderer = (function () {
             gl.bufferData(gl.ARRAY_BUFFER, p.renderData.normals, gl.STATIC_DRAW);
             gl.vertexAttribPointer(_this.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
             gl.uniform1i(_this.uEnvMap, 0);
+            gl.uniform1f(_this.uEnvironmentMipMaps, 7);
             gl.uniform1i(_this.uIrradianceMap, 1);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
@@ -2631,6 +2634,8 @@ var Renderer = (function () {
         gl.texImage2D(face, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     };
     Renderer.prototype.render = function () {
         var gl = this.context;
