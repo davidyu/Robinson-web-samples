@@ -60,8 +60,8 @@ function StartApp() {
             orbitDistance: 10
         };
         shaderRepo = new ShaderRepository(function (repo) { app = new ShowcaseApp(params, repo); });
-        environmentMap = new CubeMap("./posx.jpg", "./negx.jpg", "./posy.jpg", "./negy.jpg", "./posz.jpg", "./negz.jpg");
-        irradianceMap = new CubeMap("./irradiance_posx.jpg", "./irradiance_negx.jpg", "./irradiance_posy.jpg", "./irradiance_negy.jpg", "./irradiance_posz.jpg", "./irradiance_negz.jpg");
+        environmentMap = new CubeMap("./posx.jpg", "./negx.jpg", "./posy.jpg", "./negy.jpg", "./posz.jpg", "./negz.jpg", function () { app.dirty = true; });
+        irradianceMap = new CubeMap("./irradiance_posx.jpg", "./irradiance_negx.jpg", "./irradiance_posy.jpg", "./irradiance_negy.jpg", "./irradiance_posz.jpg", "./irradiance_negz.jpg", function () { app.dirty = true; });
         var testScene = new Scene(environmentMap, irradianceMap);
         Scene.setActiveScene(testScene);
         // sphere 1, Lambert

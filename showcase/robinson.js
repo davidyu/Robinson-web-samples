@@ -2744,7 +2744,8 @@ var CUBEMAPTYPE;
 })(CUBEMAPTYPE || (CUBEMAPTYPE = {}));
 ;
 var CubeMap = (function () {
-    function CubeMap(px, nx, py, ny, pz, nz) {
+    function CubeMap(px, nx, py, ny, pz, nz, finishedLoading) {
+        if (finishedLoading === void 0) { finishedLoading = null; }
         this.faces = [];
         this.facesLoaded = 0;
         this.cubeMapTexture = null;
@@ -2753,20 +2754,23 @@ var CubeMap = (function () {
                 this.faces[t] = new Image();
             }
         }
-        this.asyncLoadFace(px, CUBEMAPTYPE.POS_X);
-        this.asyncLoadFace(nx, CUBEMAPTYPE.NEG_X);
-        this.asyncLoadFace(py, CUBEMAPTYPE.POS_Y);
-        this.asyncLoadFace(ny, CUBEMAPTYPE.NEG_Y);
-        this.asyncLoadFace(pz, CUBEMAPTYPE.POS_Z);
-        this.asyncLoadFace(nz, CUBEMAPTYPE.NEG_Z);
+        this.asyncLoadFace(px, CUBEMAPTYPE.POS_X, finishedLoading);
+        this.asyncLoadFace(nx, CUBEMAPTYPE.NEG_X, finishedLoading);
+        this.asyncLoadFace(py, CUBEMAPTYPE.POS_Y, finishedLoading);
+        this.asyncLoadFace(ny, CUBEMAPTYPE.NEG_Y, finishedLoading);
+        this.asyncLoadFace(pz, CUBEMAPTYPE.POS_Z, finishedLoading);
+        this.asyncLoadFace(nz, CUBEMAPTYPE.NEG_Z, finishedLoading);
     }
-    CubeMap.prototype.asyncLoadFace = function (url, ctype) {
+    CubeMap.prototype.asyncLoadFace = function (url, ctype, finishedLoading) {
         var _this = this;
         this.faces[ctype].src = url;
-        this.faces[ctype].onload = function () { _this.faceLoaded(ctype); };
+        this.faces[ctype].onload = function () { _this.faceLoaded(ctype, finishedLoading); };
     };
-    CubeMap.prototype.faceLoaded = function (ctype) {
+    CubeMap.prototype.faceLoaded = function (ctype, finishedLoading) {
         this.facesLoaded++;
+        if (this.loaded) {
+            finishedLoading();
+        }
     };
     Object.defineProperty(CubeMap.prototype, "loaded", {
         // returns true when all six faces of the cube map has been loaded
