@@ -13,7 +13,8 @@ var ShowcaseApp = (function () {
         this.dirty = true;
         // camera parameters - save camera distance from target
         // construct location along viewing sphere
-        setInterval(function () { _this.fixedUpdate(); }, 1000 / 30);
+        var fu = function () { _this.fixedUpdate(); };
+        setInterval(fu, 1000 / 60);
         var WHEEL_PIXEL_TO_RADIAN = 1 / 30;
         params.vp.addEventListener('wheel', function (e) {
             e.preventDefault();

@@ -37,27 +37,6 @@ var Camera = (function () {
 })();
 var gml;
 (function (gml) {
-    /* public-facing vector (constructor sugar)
-  
-       usage:
-        new Vec(3)(x,y,z,...);
-        new Vec(4)(a,b,c,d,...);
-        new Vec(100)(x1,x2,...,x100);
-    */
-    var Vec = (function () {
-        function Vec(size) {
-            return function () {
-                var array = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    array[_i - 0] = arguments[_i];
-                }
-                return new Vector(size, array);
-            };
-        }
-        return Vec;
-    })();
-    gml.Vec = Vec;
-    // internal vector implementation; exported because Vec2, Vec3, Vec4 needs access
     var Vector = (function () {
         function Vector(size) {
             var args = [];
@@ -151,32 +130,33 @@ var gml;
         });
         Object.defineProperty(Vector.prototype, "lensq", {
             get: function () {
-                return this.v.reduce(function (acc, c) {
-                    return acc + c * c;
-                }, 0);
+                var acc = 0;
+                for (var i = 0; i < this.v.length; i++) {
+                    acc += this.v[i] * this.v[i];
+                }
+                return acc;
             },
             enumerable: true,
             configurable: true
         });
-        // this alters the underlying vector
+        /**
+         * NOTE: this alters the underlying vector. For construction of
+         * a new normalized vector, use the vector.normalized property.
+         */
         Vector.prototype.normalize = function () {
             var l = this.len;
             this.v = this.v.map(function (v) {
                 return v / l;
             });
         };
-        // this returns a new vector
-        Vector.prototype.unit = function () {
-            var l = this.len;
-            var vs = [];
-            for (var i = 0; i < this.size; i++) {
-                vs.push(this.v[i] / l);
-            }
-            return new Vector(vs.unshift(this.size));
-        };
         Object.defineProperty(Vector.prototype, "normalized", {
             get: function () {
-                return this.unit();
+                var l = this.len;
+                var vs = [];
+                for (var i = 0; i < this.size; i++) {
+                    vs.push(this.v[i] / l);
+                }
+                return new Vector(vs.unshift(this.size));
             },
             enumerable: true,
             configurable: true
@@ -198,28 +178,6 @@ var gml;
 ///<reference path="vec.ts"/>
 var gml;
 (function (gml) {
-    /* public-facing matrix (constructor sugar)
-      
-       usage:
-        new Matrix(3,3)(...);
-        new Matrix(4,4)(...);
-        new Matrix(100,6)(...);
-    */
-    var Mat = (function () {
-        function Mat(r, c) {
-            return function () {
-                var values = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    values[_i - 0] = arguments[_i];
-                }
-                return new Matrix(r, c, values);
-            };
-        }
-        return Mat;
-    })();
-    gml.Mat = Mat;
-    // internal matrix implementation; exported because Mat3, Mat4 needs access
-    // note that matrices are stored in column major order to conform to WebGL
     var Matrix = (function () {
         function Matrix(rows, cols) {
             var args = [];
@@ -268,17 +226,6 @@ var gml;
             }
             return new gml.Vector(this.cols, row);
         };
-        Matrix.prototype.setRow = function (r, row) {
-            for (var i = 0; i < this.cols; i++) {
-                this.set(r, i, row.v[i]);
-            }
-        };
-        Matrix.prototype.swapRows = function (r1, r2) {
-            var row1 = this.row(r1);
-            var row2 = this.row(r2);
-            this.setRow(r2, row1);
-            this.setRow(r1, row2);
-        };
         Matrix.prototype.column = function (c) {
             var column = [];
             for (var i = 0; i < this.rows; i++) {
@@ -286,12 +233,43 @@ var gml;
             }
             return new gml.Vector(this.rows, column);
         };
+        /**
+         * Sets a row in the matrix.
+         * @param r   the row index
+         * @param row the new contents of the row
+         */
+        Matrix.prototype.setRow = function (r, row) {
+            for (var i = 0; i < this.cols; i++) {
+                this.set(r, i, row.v[i]);
+            }
+        };
+        /**
+         * Sets a column in the matrix.
+         * @param c   the column index
+         * @param col the new contents of the column
+         */
+        Matrix.prototype.setColumn = function (c, col) {
+            for (var i = 0; i < this.rows; i++) {
+                this.set(i, c, col.v[i]);
+            }
+        };
+        /**
+         * Swaps two rows in the matrix.
+         */
+        Matrix.prototype.swapRows = function (r1, r2) {
+            var row1 = this.row(r1);
+            var row2 = this.row(r2);
+            this.setRow(r2, row1);
+            this.setRow(r1, row2);
+        };
         Object.defineProperty(Matrix.prototype, "trace", {
+            /**
+             * NOTE: a trace is only defined for square matrices.
+             * If you try to acquire the trace of a nonsquare matrix, the library
+             * will not stop you or throw an excpetion, but the result will be
+             * undefined/incorrect.
+             */
             get: function () {
-                if (this.rows != this.cols) {
-                    console.warn("matrix not square, cannot compute trace!");
-                    return 0;
-                }
                 var tr = 0;
                 for (var i = 0; i < this.rows; i++) {
                     tr += this.get(i, i);
@@ -301,6 +279,12 @@ var gml;
             enumerable: true,
             configurable: true
         });
+        /**
+         * @returns The LU decomposition of the matrix. If no such decomposition
+         * exists, the l and u properties of the return object are both null.
+         *
+         * This implementation of LU decomposition uses the Doolittle algorithm.
+         */
         Matrix.prototype.lu = function () {
             if (this.rows != this.cols) {
                 console.warn("matrix not square; cannot perform LU decomposition!");
@@ -341,9 +325,18 @@ var gml;
             return { l: l, u: u };
         };
         Object.defineProperty(Matrix.prototype, "determinant", {
+            /**
+             * @returns the determinant of the matrix, if it is square.
+             *
+             * NOTE: If you try to acquire the determinant of a nonsquare matrix,
+             * the result returned will be 0.
+             *
+             * If the LU decomposition of the matrix fails (IE: the matrix is linearly
+             * dependent in terms of its row vectors or columns vectors), the result
+             * returned will be 0.
+             */
             get: function () {
                 if (this.rows != this.cols) {
-                    console.warn("matrix not square, cannot perform LU decomposition!");
                     return 0;
                 }
                 var _a = this.lu(), l = _a.l, u = _a.u;
@@ -359,6 +352,11 @@ var gml;
             enumerable: true,
             configurable: true
         });
+        /**
+         * Componentwise addition of two matrices. Does not alter the original matrix.
+         *
+         * @returns a new matrix resulting from the addition
+         */
         Matrix.prototype.add = function (rhs) {
             var vs = [];
             var rvs = rhs.v;
@@ -367,6 +365,11 @@ var gml;
             }
             return new Matrix(this.rows, this.cols, vs);
         };
+        /**
+         * Componentwise subtraction of two matrices. Does not alter the original matrix.
+         *
+         * @returns a new matrix resulting from the subtraction operation this - rhs
+         */
         Matrix.prototype.subtract = function (rhs) {
             var vs = [];
             var rvs = rhs.v;
@@ -449,6 +452,10 @@ var gml;
             return str;
         };
         Object.defineProperty(Matrix.prototype, "m", {
+            /**
+             * @returns The contents of the matrix, stored in column-major order and
+             * encoded as a Float32Array.
+             */
             get: function () {
                 return this.transpose_Float32Array(this.v, this.rows, this.cols);
             },
@@ -467,6 +474,32 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var gml2d;
 (function (gml2d) {
+    /**
+     *
+     * @preferred
+     *
+     * an homogenous 2D transformation matrix (with rotations in theta specified in CCW):
+     *
+     * <pre>
+     * sx * cos(theta),-sx * sin(theta), tx
+     * sy * sin(theta), sy * cos(theta), ty
+     * 0              , 0              ,  1
+     * </pre>
+     */
+    /*
+      from this, given a mat3:
+  
+      a b tx
+      c d ty
+      0 0 1
+  
+      we can derive:
+  
+      sx = sqrt( a*a + b*b )
+      sy = sqrt( c*c + d*d )
+  
+      theta = atan( b/a ) or atan( -c/d ) with some caveats
+    */
     var Mat3 = (function (_super) {
         __extends(Mat3, _super);
         function Mat3() {
@@ -490,13 +523,6 @@ var gml2d;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "r02", {
-            get: function () {
-                return this.get(0, 2);
-            },
-            enumerable: true,
-            configurable: true
-        });
         Object.defineProperty(Mat3.prototype, "r10", {
             get: function () {
                 return this.get(1, 0);
@@ -511,14 +537,7 @@ var gml2d;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "r12", {
-            get: function () {
-                return this.get(1, 2);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r20", {
+        Object.defineProperty(Mat3.prototype, "m20", {
             get: function () {
                 return this.get(2, 0);
             },
@@ -559,16 +578,6 @@ var gml2d;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "w", {
-            get: function () {
-                return this.get(2, 2);
-            },
-            set: function (v) {
-                this.set(2, 2, v);
-            },
-            enumerable: true,
-            configurable: true
-        });
         Object.defineProperty(Mat3.prototype, "rotation", {
             // slow public rotation accessor
             get: function () {
@@ -594,7 +603,7 @@ var gml2d;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "rot_raw", {
+        Object.defineProperty(Mat3.prototype, "rot_rad", {
             // internal accessor
             get: function () {
                 var a = this.get(0, 0); // cos term
@@ -616,7 +625,7 @@ var gml2d;
                 return Math.sqrt(a * a + b * b);
             },
             set: function (v) {
-                var rad = this.rot_raw;
+                var rad = this.rot_rad;
                 this.set(0, 0, v * Math.cos(rad));
                 this.set(0, 1, -v * Math.sin(rad));
             },
@@ -630,7 +639,7 @@ var gml2d;
                 return Math.sqrt(c * c + d * d);
             },
             set: function (v) {
-                var rad = this.rot_raw;
+                var rad = this.rot_rad;
                 this.set(1, 0, v * Math.sin(rad));
                 this.set(1, 1, v * Math.cos(rad));
             },
@@ -658,11 +667,21 @@ var gml2d;
         Mat3.identity = function () {
             return new Mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
         };
+        Mat3.fromRows = function (r1, r2, r3) {
+            return new Mat3(r1.x, r1.y, r1.w, r2.x, r2.y, r2.w, r3.x, r3.y, r3.w);
+        };
+        Mat3.fromCols = function (c1, c2, c3) {
+            return new Mat3(c1.x, c2.x, c3.x, c1.y, c2.y, c3.y, c1.w, c2.w, c3.w);
+        };
         return Mat3;
     })(gml.Matrix);
     gml2d.Mat3 = Mat3;
 })(gml2d || (gml2d = {}));
-///<reference path="../mat.ts"/>
+///<reference path="../vec.ts"/>
+/**
+ * The gml2d library is mostly designed with 2D usage (games/visualization)
+ * in mind.
+ */
 var gml2d;
 (function (gml2d) {
     var Vec2 = (function (_super) {
@@ -717,12 +736,34 @@ var gml2d;
         Vec2.prototype.dot = function (rhs) {
             return this.x * rhs.x + this.y * rhs.y;
         };
+        Object.defineProperty(Vec2.prototype, "normalized", {
+            get: function () {
+                var len = this.len;
+                return new Vec2(this.x / len, this.y / len);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        /**
+         * Computes the '2D' cross product
+         */
         Vec2.prototype.cross = function (rhs) {
             return this.x * rhs.y - this.y * rhs.x;
         };
         Vec2.prototype.map = function (callback) {
             return new Vec2(this.v.map(callback));
         };
+        Vec2.randomInCircle = function (radius) {
+            if (radius === void 0) { radius = 1; }
+            return new Vec2(Math.random(), Math.random()).normalized.multiply(radius);
+        };
+        Object.defineProperty(Vec2, "zero", {
+            get: function () {
+                return new Vec2(0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
         return Vec2;
     })(gml.Vector);
     gml2d.Vec2 = Vec2;
@@ -730,6 +771,10 @@ var gml2d;
 ///<reference path="../vec.ts"/>
 var gml2d;
 (function (gml2d) {
+    /**
+     * A 2D homogenous vector (x, y, w) representing the point (x/w, y/w) or the
+     * vector (x,y)
+     */
     var Vec3 = (function (_super) {
         __extends(Vec3, _super);
         function Vec3() {
@@ -764,41 +809,44 @@ var gml2d;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Vec3.prototype, "z", {
+        Object.defineProperty(Vec3.prototype, "w", {
             get: function () {
                 return this.v[2];
             },
-            set: function (z) {
-                this.v[2] = z;
+            set: function (w) {
+                this.v[2] = w;
             },
             enumerable: true,
             configurable: true
         });
         Vec3.prototype.add = function (rhs) {
-            return new Vec3(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z);
+            return new Vec3(this.x + rhs.x, this.y + rhs.y, this.w + rhs.w);
         };
         Vec3.prototype.subtract = function (rhs) {
-            return new Vec3(this.x - rhs.x, this.y - rhs.y, this.z - rhs.z);
+            return new Vec3(this.x - rhs.x, this.y - rhs.y, this.w - rhs.w);
         };
         Vec3.prototype.multiply = function (s) {
-            return new Vec3(this.x * s, this.y * s, this.z * s);
+            return new Vec3(this.x * s, this.y * s, this.w * s);
         };
         Vec3.prototype.divide = function (d) {
-            return new Vec3(this.x / d, this.y / d, this.z / d);
+            return new Vec3(this.x / d, this.y / d, this.w / d);
         };
         Vec3.prototype.negate = function () {
-            return new Vec3(-this.x, -this.y, -this.z);
+            return new Vec3(-this.x, -this.y, -this.w);
         };
         Vec3.prototype.dot = function (rhs) {
-            return this.x * rhs.x + this.y * rhs.y + this.z * rhs.z;
+            return this.x * rhs.x + this.y * rhs.y + this.w * rhs.w;
         };
+        /**
+         * Computes the '2D' cross product as if this were a 2D vector (Vec2)
+         */
         Vec3.prototype.cross = function (rhs) {
             return this.x * rhs.y - this.y * rhs.x;
         };
         Object.defineProperty(Vec3.prototype, "normalized", {
             get: function () {
                 var len = this.len;
-                return new Vec3(this.x / len, this.y / len, this.z / len);
+                return new Vec3(this.x / len, this.y / len, this.w / len);
             },
             enumerable: true,
             configurable: true
@@ -806,6 +854,31 @@ var gml2d;
         Vec3.prototype.map = function (callback) {
             return new Vec3(this.v.map(callback));
         };
+        /**
+         * @returns a random directional Vec3 in a user-specified circle centered around the origin.
+         *          Note that the w-component of the Vec3 is 0.
+         */
+        Vec3.randomInCircle = function (radius) {
+            if (radius === void 0) { radius = 1; }
+            return new Vec3(Math.random(), Math.random(), 0).normalized.multiply(radius);
+        };
+        /**
+         * @returns a random positional Vec3 in a user-specified circle centered around the origin.
+         *          Note that the w-component of the Vec3 is 1.
+         */
+        Vec3.randomPositionInCircle = function (radius) {
+            if (radius === void 0) { radius = 1; }
+            var random = new Vec3(Math.random(), Math.random(), 0).normalized.multiply(radius);
+            random.w = 1;
+            return random;
+        };
+        Object.defineProperty(Vec3, "zero", {
+            get: function () {
+                return new Vec3(0, 0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
         return Vec3;
     })(gml.Vector);
     gml2d.Vec3 = Vec3;
@@ -820,11 +893,19 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
-            _super.call(this, 3, 3, args);
+            if (args.length === 1) {
+                _super.call(this, 3, 3, args[0]);
+            }
+            else {
+                _super.call(this, 3, 3, args);
+            }
         }
         Object.defineProperty(Mat3.prototype, "r00", {
             get: function () {
                 return this.get(0, 0);
+            },
+            set: function (v) {
+                this.set(0, 0, v);
             },
             enumerable: true,
             configurable: true
@@ -833,59 +914,13 @@ var gml;
             get: function () {
                 return this.get(0, 1);
             },
+            set: function (v) {
+                this.set(0, 1, v);
+            },
             enumerable: true,
             configurable: true
         });
         Object.defineProperty(Mat3.prototype, "r02", {
-            get: function () {
-                return this.get(0, 2);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r10", {
-            get: function () {
-                return this.get(1, 0);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r11", {
-            get: function () {
-                return this.get(1, 1);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r12", {
-            get: function () {
-                return this.get(1, 2);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r20", {
-            get: function () {
-                return this.get(2, 0);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r21", {
-            get: function () {
-                return this.get(2, 1);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "r22", {
-            get: function () {
-                return this.get(2, 2);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "tx", {
             get: function () {
                 return this.get(0, 2);
             },
@@ -895,7 +930,27 @@ var gml;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "ty", {
+        Object.defineProperty(Mat3.prototype, "r10", {
+            get: function () {
+                return this.get(1, 0);
+            },
+            set: function (v) {
+                this.set(1, 0, v);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Mat3.prototype, "r11", {
+            get: function () {
+                return this.get(1, 1);
+            },
+            set: function (v) {
+                this.set(1, 1, v);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Mat3.prototype, "r12", {
             get: function () {
                 return this.get(1, 2);
             },
@@ -905,80 +960,32 @@ var gml;
             enumerable: true,
             configurable: true
         });
-        Object.defineProperty(Mat3.prototype, "w", {
+        Object.defineProperty(Mat3.prototype, "r20", {
+            get: function () {
+                return this.get(2, 0);
+            },
+            set: function (v) {
+                this.set(2, 0, v);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Mat3.prototype, "r21", {
+            get: function () {
+                return this.get(2, 1);
+            },
+            set: function (v) {
+                this.set(2, 1, v);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Mat3.prototype, "r22", {
             get: function () {
                 return this.get(2, 2);
             },
             set: function (v) {
                 this.set(2, 2, v);
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "rotation", {
-            // slow public rotation accessor
-            get: function () {
-                var a = this.get(0, 0); // cos term
-                var b = this.get(0, 1); // sin term
-                // when 90 < rot <= 270, atan returns  rot-180 (atan returns results in the [ -90, 90 ] range), so correct it
-                if (a < 0) {
-                    return gml.fromRadians(Math.atan(b / a) + Math.PI);
-                }
-                else {
-                    return gml.fromRadians(Math.atan(b / a));
-                }
-            },
-            set: function (v) {
-                var rad = v.toRadians();
-                var sx = this.sx;
-                var sy = this.sy;
-                this.set(0, 0, sx * Math.cos(rad));
-                this.set(0, 1, -sx * Math.sin(rad));
-                this.set(1, 0, sy * Math.sin(rad));
-                this.set(1, 1, sy * Math.cos(rad));
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "rot_raw", {
-            // internal accessor
-            get: function () {
-                var a = this.get(0, 0); // cos term
-                var b = this.get(0, 1); // sin term
-                if (a < 0) {
-                    return Math.atan(b / a) + Math.PI;
-                }
-                else {
-                    return Math.atan(b / a);
-                }
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "sx", {
-            get: function () {
-                var a = this.get(0, 0);
-                var b = this.get(0, 1);
-                return Math.sqrt(a * a + b * b);
-            },
-            set: function (v) {
-                var rad = this.rot_raw;
-                this.set(0, 0, v * Math.cos(rad));
-                this.set(0, 1, -v * Math.sin(rad));
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(Mat3.prototype, "sy", {
-            get: function () {
-                var c = this.get(1, 0);
-                var d = this.get(1, 1);
-                return Math.sqrt(c * c + d * d);
-            },
-            set: function (v) {
-                var rad = this.rot_raw;
-                this.set(1, 0, v * Math.sin(rad));
-                this.set(1, 1, v * Math.cos(rad));
             },
             enumerable: true,
             configurable: true
@@ -999,13 +1006,90 @@ var gml;
         };
         Mat3.prototype.multiply = function (arg) {
             var m = _super.prototype.multiply.call(this, arg);
-            return new Mat3(m.m);
+            return new Mat3(m.v);
         };
+        Mat3.prototype.scalarmul = function (s) {
+            var m = _super.prototype.scalarmul.call(this, s);
+            return new Mat3(m.v);
+        };
+        Mat3.prototype.subtract = function (rhs) {
+            var m = _super.prototype.subtract.call(this, rhs);
+            return new Mat3(m.v);
+        };
+        Mat3.prototype.add = function (rhs) {
+            var m = _super.prototype.add.call(this, rhs);
+            return new Mat3(m.v);
+        };
+        Mat3.prototype.transpose = function () {
+            return new Mat3(_super.prototype.transpose.call(this).v);
+        };
+        Mat3.prototype.transform = function (rhs) {
+            return new gml.Vec3(this.r00 * rhs.x + this.r01 * rhs.y + this.r02 * rhs.z, this.r10 * rhs.x + this.r11 * rhs.y + this.r12 * rhs.z, this.r20 * rhs.x + this.r21 * rhs.y + this.r22 * rhs.z);
+        };
+        /**
+         * constructs a Mat4 with the contents of this Mat3 forming the top-left
+         * portion of the new Mat4. The translation portion of the new Mat4 is assumed
+         * to be zero.
+         *
+         * E.G.:
+         * <pre>
+         * a b c       a b c 0
+         * d e f  -->  d e f 0
+         * g h i       g h i 0
+         *             0 0 0 1
+         * </pre>
+         */
         Mat3.prototype.toMat4 = function () {
             return new gml.Mat4(this.r00, this.r01, this.r02, 0, this.r10, this.r11, this.r12, 0, this.r20, this.r21, this.r22, 0, 0, 0, 0, 1);
         };
+        /**
+         * constructs a matrix representing a rotation around the Y axis, IE yaw.
+         * @param angle the angle to rotate around the Y-axis by (rotation is counter-clockwise).
+         */
+        Mat3.rotateY = function (angle) {
+            var s = Math.sin(angle.toRadians());
+            var c = Math.cos(angle.toRadians());
+            return new Mat3(c, 0, -s, 0, 1, 0, s, 0, c);
+        };
+        /**
+         * constructs a matrix representing a rotation around the X axis, IE pitch.
+         * @param angle the angle to rotate around the X-axis by (rotation is counter-clockwise).
+         */
+        Mat3.rotateX = function (angle) {
+            var s = Math.sin(angle.toRadians());
+            var c = Math.cos(angle.toRadians());
+            return new Mat3(1, 0, 0, 0, c, s, 0, -s, c);
+        };
+        /**
+         * constructs a matrix representing a rotation around the Z axis, IE roll.
+         * @param angle the angle to rotate around the Z-axis by (rotation is counter-clockwise).
+         */
+        Mat3.rotateZ = function (angle) {
+            var s = Math.sin(angle.toRadians());
+            var c = Math.cos(angle.toRadians());
+            return new Mat3(c, s, 0, -s, c, 0, 0, 0, 1);
+        };
+        /**
+         * constructs a matrix representing a rotation around a user-specified axis.
+         * @param axis  the axis of rotation.
+         * @param angle the angle to rotate around the axis by (rotation is counter-clockwise).
+         */
+        Mat3.rotate = function (axis, angle) {
+            var k = new Mat3(0, -axis.z, axis.y, axis.z, 0, -axis.x, -axis.y, axis.x, 0);
+            var k2 = k.multiply(k);
+            var r = angle.toRadians();
+            return Mat3.identity()
+                .add(k.multiply(Math.sin(r)))
+                .add(k2.multiply(1 - Math.cos(r)));
+        };
         Mat3.identity = function () {
             return new Mat3(1, 0, 0, 0, 1, 0, 0, 0, 1);
+        };
+        Mat3.fromRows = function (r1, r2, r3) {
+            return new Mat3(r1.x, r1.y, r1.z, r2.x, r2.y, r2.z, r3.x, r3.y, r3.z);
+        };
+        Mat3.fromCols = function (c1, c2, c3) {
+            return new Mat3(c1.x, c2.x, c3.x, c1.y, c2.y, c3.y, c1.z, c2.z, c3.z);
         };
         return Mat3;
     })(gml.Matrix);
@@ -1212,11 +1296,6 @@ var gml;
             }
             return new gml.Vec4(column);
         };
-        Mat4.prototype.setColumn = function (c, v) {
-            for (var i = 0; i < 4; i++) {
-                this.set(i, c, v.v[i]);
-            }
-        };
         Object.defineProperty(Mat4.prototype, "translation", {
             get: function () {
                 return this.column(3);
@@ -1240,20 +1319,21 @@ var gml;
             configurable: true
         });
         Mat4.prototype.multiply = function (arg) {
-            var m = _super.prototype.multiply.call(this, arg);
-            return new Mat4(m.v);
+            if (arg instanceof Mat4) {
+                return Mat4.matmul(this, arg);
+            }
+            else {
+                return this.scalarmul(arg);
+            }
         };
         Mat4.prototype.scalarmul = function (s) {
-            var m = _super.prototype.scalarmul.call(this, s);
-            return new Mat4(m.v);
+            return new Mat4(this.v[0] * s, this.v[1] * s, this.v[2] * s, this.v[3] * s, this.v[4] * s, this.v[5] * s, this.v[6] * s, this.v[7] * s, this.v[8] * s, this.v[9] * s, this.v[10] * s, this.v[11] * s, this.v[12] * s, this.v[13] * s, this.v[14] * s, this.v[15] * s);
         };
         Mat4.prototype.subtract = function (rhs) {
-            var m = _super.prototype.subtract.call(this, rhs);
-            return new Mat4(m.v);
+            return new Mat4(this.v[0] - rhs.v[0], this.v[1] - rhs.v[1], this.v[2] - rhs.v[2], this.v[3] - rhs.v[3], this.v[4] - rhs.v[4], this.v[5] - rhs.v[5], this.v[6] - rhs.v[6], this.v[7] - rhs.v[7], this.v[8] - rhs.v[8], this.v[9] - rhs.v[9], this.v[10] - rhs.v[10], this.v[11] - rhs.v[11], this.v[12] - rhs.v[12], this.v[13] - rhs.v[13], this.v[14] - rhs.v[14], this.v[15] - rhs.v[15]);
         };
         Mat4.prototype.add = function (rhs) {
-            var m = _super.prototype.add.call(this, rhs);
-            return new Mat4(m.v);
+            return new Mat4(this.v[0] + rhs.v[0], this.v[1] + rhs.v[1], this.v[2] + rhs.v[2], this.v[3] + rhs.v[3], this.v[4] + rhs.v[4], this.v[5] + rhs.v[5], this.v[6] + rhs.v[6], this.v[7] + rhs.v[7], this.v[8] + rhs.v[8], this.v[9] + rhs.v[9], this.v[10] + rhs.v[10], this.v[11] + rhs.v[11], this.v[12] + rhs.v[12], this.v[13] + rhs.v[13], this.v[14] + rhs.v[14], this.v[15] + rhs.v[15]);
         };
         Mat4.prototype.transform = function (rhs) {
             return new gml.Vec4(this.r00 * rhs.x + this.r01 * rhs.y + this.r02 * rhs.z + this.tx * rhs.w, this.r10 * rhs.x + this.r11 * rhs.y + this.r12 * rhs.z + this.ty * rhs.w, this.r20 * rhs.x + this.r21 * rhs.y + this.r22 * rhs.z + this.tz * rhs.w, this.m30 * rhs.x + this.m31 * rhs.y + this.m32 * rhs.z + this.m33 * rhs.w);
@@ -1270,6 +1350,40 @@ var gml;
             var c = m2.scalarmul(tr).subtract(m3);
             return Mat4.identity().scalarmul(a).subtract(this.scalarmul(b)).add(c).scalarmul(1 / d);
         };
+        Object.defineProperty(Mat4.prototype, "determinant", {
+            /**
+             * @returns the determinant of Mat4.
+             *
+             * Hand-rolled for Mat4 to avoid call to Mat.LU, which is unoptimized and
+             * expensive for real-time applications.
+             */
+            get: function () {
+                var m00 = this.v[0];
+                var m01 = this.v[1];
+                var m02 = this.v[2];
+                var m03 = this.v[3];
+                var m10 = this.v[4];
+                var m11 = this.v[5];
+                var m12 = this.v[6];
+                var m13 = this.v[7];
+                var m20 = this.v[8];
+                var m21 = this.v[9];
+                var m22 = this.v[10];
+                var m23 = this.v[11];
+                var m30 = this.v[12];
+                var m31 = this.v[13];
+                var m32 = this.v[14];
+                var m33 = this.v[15];
+                return m03 * m12 * m21 * m30 - m02 * m13 * m21 * m30 - m03 * m11 * m22 * m30 + m01 * m13 * m22 * m30 +
+                    m02 * m11 * m23 * m30 - m01 * m12 * m23 * m30 - m03 * m12 * m20 * m31 + m02 * m13 * m20 * m31 +
+                    m03 * m10 * m22 * m31 - m00 * m13 * m22 * m31 - m02 * m10 * m23 * m31 + m00 * m12 * m23 * m31 +
+                    m03 * m11 * m20 * m32 - m01 * m13 * m20 * m32 - m03 * m10 * m21 * m32 + m00 * m13 * m21 * m32 +
+                    m01 * m10 * m23 * m32 - m00 * m11 * m23 * m32 - m02 * m11 * m20 * m33 + m01 * m12 * m20 * m33 +
+                    m02 * m10 * m21 * m33 - m00 * m12 * m21 * m33 - m01 * m10 * m22 * m33 + m00 * m11 * m22 * m33;
+            },
+            enumerable: true,
+            configurable: true
+        });
         Mat4.prototype.transpose = function () {
             return new Mat4(_super.prototype.transpose.call(this).v);
         };
@@ -1283,21 +1397,38 @@ var gml;
         Mat4.identity = function () {
             return new Mat4(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
         };
+        /**
+         * constructs a matrix representing a rotation around the Y axis, IE yaw.
+         * @param angle the angle to rotate around the Y-axis by (rotation is counter-clockwise).
+         */
         Mat4.rotateY = function (angle) {
             var s = Math.sin(angle.toRadians());
             var c = Math.cos(angle.toRadians());
             return new Mat4(c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1);
         };
+        /**
+         * constructs a matrix representing a rotation around the X axis, IE pitch.
+         * @param angle the angle to rotate around the X-axis by (rotation is counter-clockwise).
+         */
         Mat4.rotateX = function (angle) {
             var s = Math.sin(angle.toRadians());
             var c = Math.cos(angle.toRadians());
             return new Mat4(1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1);
         };
+        /**
+         * constructs a matrix representing a rotation around the Z axis, IE roll.
+         * @param angle the angle to rotate around the Z-axis by (rotation is counter-clockwise).
+         */
         Mat4.rotateZ = function (angle) {
             var s = Math.sin(angle.toRadians());
             var c = Math.cos(angle.toRadians());
             return new Mat4(c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
         };
+        /**
+         * constructs a matrix representing a rotation around a user-specified axis.
+         * @param axis  the axis of rotation.
+         * @param angle the angle to rotate around the axis by (rotation is counter-clockwise).
+         */
         Mat4.rotate = function (axis, angle) {
             var k = new Mat4(0, -axis.z, axis.y, 0, axis.z, 0, -axis.x, 0, -axis.y, axis.x, 0, 0, 0, 0, 0, 0);
             var k2 = k.multiply(k);
@@ -1306,17 +1437,56 @@ var gml;
                 .add(k.multiply(Math.sin(r)))
                 .add(k2.multiply(1 - Math.cos(r)));
         };
+        /**
+         * constructs a matrix representing a translation.
+         */
+        Mat4.translate = function (v) {
+            return new Mat4(1, 0, 0, v.x, 0, 1, 0, v.y, 0, 0, 1, v.z, 0, 0, 0, 1);
+        };
+        Mat4.fromRows = function (r1, r2, r3, r4) {
+            return new Mat4(r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z, r2.w, r3.x, r3.y, r3.z, r3.w, r4.x, r4.y, r4.z, r4.w);
+        };
+        Mat4.fromCols = function (c1, c2, c3, c4) {
+            return new Mat4(c1.x, c2.x, c3.x, c4.x, c1.y, c2.y, c3.y, c4.y, c1.z, c2.z, c3.z, c4.z, c1.w, c2.w, c3.w, c4.w);
+        };
+        Mat4.matmul = function (lhs, rhs) {
+            var l00 = lhs.v[0];
+            var l01 = lhs.v[1];
+            var l02 = lhs.v[2];
+            var l03 = lhs.v[3];
+            var l10 = lhs.v[4];
+            var l11 = lhs.v[5];
+            var l12 = lhs.v[6];
+            var l13 = lhs.v[7];
+            var l20 = lhs.v[8];
+            var l21 = lhs.v[9];
+            var l22 = lhs.v[10];
+            var l23 = lhs.v[11];
+            var l30 = lhs.v[12];
+            var l31 = lhs.v[13];
+            var l32 = lhs.v[14];
+            var l33 = lhs.v[15];
+            var r00 = rhs.v[0];
+            var r01 = rhs.v[1];
+            var r02 = rhs.v[2];
+            var r03 = rhs.v[3];
+            var r10 = rhs.v[4];
+            var r11 = rhs.v[5];
+            var r12 = rhs.v[6];
+            var r13 = rhs.v[7];
+            var r20 = rhs.v[8];
+            var r21 = rhs.v[9];
+            var r22 = rhs.v[10];
+            var r23 = rhs.v[11];
+            var r30 = rhs.v[12];
+            var r31 = rhs.v[13];
+            var r32 = rhs.v[14];
+            var r33 = rhs.v[15];
+            return new Mat4(l00 * r00 + l01 * r10 + l02 * r20 + l03 * r30, l00 * r01 + l01 * r11 + l02 * r21 + l03 * r31, l00 * r02 + l01 * r12 + l02 * r22 + l03 * r32, l00 * r03 + l01 * r13 + l02 * r23 + l03 * r33, l10 * r00 + l11 * r10 + l12 * r20 + l13 * r30, l10 * r01 + l11 * r11 + l12 * r21 + l13 * r31, l10 * r02 + l11 * r12 + l12 * r22 + l13 * r32, l10 * r03 + l11 * r13 + l12 * r23 + l13 * r33, l20 * r00 + l21 * r10 + l22 * r20 + l23 * r30, l20 * r01 + l21 * r11 + l22 * r21 + l23 * r31, l20 * r02 + l21 * r12 + l22 * r22 + l23 * r32, l20 * r03 + l21 * r13 + l22 * r23 + l23 * r33, l30 * r00 + l31 * r10 + l32 * r20 + l33 * r30, l30 * r01 + l31 * r11 + l32 * r21 + l33 * r31, l30 * r02 + l31 * r12 + l32 * r22 + l33 * r32, l30 * r03 + l31 * r13 + l32 * r23 + l33 * r33);
+        };
         return Mat4;
     })(gml.Matrix);
     gml.Mat4 = Mat4;
-    function makeMat4FromRows(r1, r2, r3, r4) {
-        return new Mat4(r1.x, r1.y, r1.z, r1.w, r2.x, r2.y, r2.z, r2.w, r3.x, r3.y, r3.z, r3.w, r4.x, r4.y, r4.z, r4.w);
-    }
-    gml.makeMat4FromRows = makeMat4FromRows;
-    function makeMat4FromCols(c1, c2, c3, c4) {
-        return new Mat4(c1.x, c2.x, c3.x, c4.x, c1.y, c2.y, c3.y, c4.y, c1.z, c2.z, c3.z, c4.z, c1.w, c2.w, c3.w, c4.w);
-    }
-    gml.makeMat4FromCols = makeMat4FromCols;
     function makePerspective(fov, aspectRatio, near, far) {
         var t = near * Math.tan(fov.toRadians() / 2);
         var r = t * aspectRatio;
@@ -1332,7 +1502,7 @@ var gml;
         var x = right.normalized;
         var y = up.normalized;
         var z = aim.negate().normalized;
-        var lookAt = makeMat4FromRows(x, y, z, new gml.Vec4(0, 0, 0, 1));
+        var lookAt = Mat4.fromRows(x, y, z, new gml.Vec4(0, 0, 0, 1));
         var npos = pos.negate();
         lookAt.tx = npos.dot(x);
         lookAt.ty = npos.dot(y);
@@ -1396,12 +1566,28 @@ var gml;
         Vec2.prototype.dot = function (rhs) {
             return this.x * rhs.x + this.y * rhs.y;
         };
-        Vec2.prototype.cross = function (rhs) {
-            return this.x * rhs.y - this.y * rhs.x;
-        };
+        Object.defineProperty(Vec2.prototype, "normalized", {
+            get: function () {
+                var len = this.len;
+                return new Vec2(this.x / len, this.y / len);
+            },
+            enumerable: true,
+            configurable: true
+        });
         Vec2.prototype.map = function (callback) {
             return new Vec2(this.v.map(callback));
         };
+        Vec2.randomInCircle = function (radius) {
+            if (radius === void 0) { radius = 1; }
+            return new Vec2(Math.random(), Math.random()).normalized.multiply(radius);
+        };
+        Object.defineProperty(Vec2, "zero", {
+            get: function () {
+                return new Vec2(0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
         return Vec2;
     })(gml.Vector);
     gml.Vec2 = Vec2;
@@ -1453,6 +1639,43 @@ var gml;
             enumerable: true,
             configurable: true
         });
+        Object.defineProperty(Vec3.prototype, "r", {
+            get: function () {
+                return this.v[0];
+            },
+            set: function (r) {
+                this.v[0] = r;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Vec3.prototype, "g", {
+            get: function () {
+                return this.v[1];
+            },
+            set: function (g) {
+                this.v[1] = g;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Vec3.prototype, "b", {
+            get: function () {
+                return this.v[2];
+            },
+            set: function (b) {
+                this.v[2] = b;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Vec3.prototype, "xy", {
+            get: function () {
+                return new gml.Vec2(this.x, this.y);
+            },
+            enumerable: true,
+            configurable: true
+        });
         Vec3.prototype.add = function (rhs) {
             return new Vec3(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z);
         };
@@ -1485,6 +1708,17 @@ var gml;
         Vec3.prototype.map = function (callback) {
             return new Vec3(this.v.map(callback));
         };
+        Vec3.randomInSphere = function (radius) {
+            if (radius === void 0) { radius = 1; }
+            return new Vec3(Math.random(), Math.random(), Math.random()).normalized.multiply(radius);
+        };
+        Object.defineProperty(Vec3, "zero", {
+            get: function () {
+                return new Vec3(0, 0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
         return Vec3;
     })(gml.Vector);
     gml.Vec3 = Vec3;
@@ -1618,7 +1852,13 @@ var gml;
         Vec4.prototype.dot = function (rhs) {
             return this.x * rhs.x + this.y * rhs.y + this.z * rhs.z + this.w * rhs.w;
         };
-        // ignores w component
+        /**
+         * Computes the cross product as if this were a 3D vector (Vec3)
+         *
+         * @returns a Vec4 with its xyz components representing the 3D cross product
+         *          between this and rhs. The w component of the resulting vector is
+         *          always set to 0
+         */
         Vec4.prototype.cross = function (rhs) {
             return new Vec4(this.y * rhs.z - this.z * rhs.y, this.z * rhs.x - this.x * rhs.z, this.x * rhs.y - this.y * rhs.x, 0);
         };
@@ -1633,16 +1873,31 @@ var gml;
         Vec4.prototype.map = function (callback) {
             return new Vec4(this.v.map(callback));
         };
+        /**
+         * @returns a random directional Vec4 in a user-specified sphere centered around (0, 0, 0).
+         *          Note that the w-component of the Vec4 is 0.
+         */
         Vec4.randomInSphere = function (radius) {
             if (radius === void 0) { radius = 1; }
             return new Vec4(Math.random(), Math.random(), Math.random(), 0).normalized.multiply(radius);
         };
+        /**
+         * @returns a random positional Vec4 in a user-specified sphere centered around (0, 0, 0).
+         *          Note that the w-component of the Vec4 is 1.
+         */
         Vec4.randomPositionInSphere = function (radius) {
             if (radius === void 0) { radius = 1; }
             var random = new Vec4(Math.random(), Math.random(), Math.random(), 0).normalized.multiply(radius);
             random.w = 1;
             return random;
         };
+        Object.defineProperty(Vec4, "zero", {
+            get: function () {
+                return new Vec4(0, 0, 0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
         Object.defineProperty(Vec4, "origin", {
             get: function () {
                 return new Vec4(0, 0, 0, 1);
@@ -1669,6 +1924,11 @@ var gml;
     gml.Vec4 = Vec4;
 })(gml || (gml = {}));
 // simple angle interface with explicit constructors
+/**
+ * The gml library is mostly designed with 3D usage (WebGL) in mind.
+ * It aspires to be performant, but is not yet up to par with incumbent
+ * libraries (EG: gl-matrix)
+ */
 var gml;
 (function (gml) {
     function fromRadians(rad) {
@@ -1719,7 +1979,6 @@ var gml;
         });
         return Degree;
     })();
-    gml.Degree = Degree;
     var Radian = (function () {
         function Radian(rad) {
             this.v = rad;
@@ -1764,10 +2023,16 @@ var gml;
         });
         return Radian;
     })();
-    gml.Radian = Radian;
 })(gml || (gml = {}));
 var gml;
 (function (gml) {
+    /**
+     * Implements common easing methods (generally used) for tweening/
+     * animations.
+     *
+     * All methods assume a normalized input t (time) between 0 and 1
+     * and returns an output t' between 0 and 1.
+     */
     var Easing = (function () {
         function Easing() {
         }
@@ -1817,9 +2082,9 @@ var gml;
                  *
                  * we double the input parameter s.t. it is 0 to 1, then pass it into
                  * the CubicIn function (t*t*t), then half the result to get an output
-                 * from 0 to 0.5. Constant terms cancel to resolve to 4*t*t
+                 * from 0 to 0.5. Constant terms cancel to resolve to 4*t*t*t
                  */
-                return 4 * t * t;
+                return 4 * t * t * t;
             }
             else {
                 /* we want verbatim behavior as CubicOut, except we're passing in t
@@ -1832,6 +2097,64 @@ var gml;
                  */
                 var _t = ((t - 0.5) * 2) - 1;
                 return (_t * _t * _t + 1) / 2 + 0.5;
+            }
+        };
+        Easing.TrigIn = function (t) {
+            return 1 - Math.cos(t * (Math.PI / 2));
+        };
+        Easing.TrigOut = function (t) {
+            return Math.sin(t * (Math.PI / 2));
+        };
+        Easing.TrigInOut = function (t) {
+            if (t < 0.5) {
+                return 0.5 * (Math.sin(Math.PI * t));
+            }
+            else {
+                return -0.5 * (Math.cos(Math.PI * (2 * t - 1) / 2) - 2);
+            }
+        };
+        Easing.ExpIn = function (t, base) {
+            if (base === void 0) { base = 10; }
+            return t == 0 ? 0 : Math.pow(2, base * (t - 1));
+        };
+        Easing.ExpOut = function (t, base) {
+            if (base === void 0) { base = 10; }
+            return t == 1 ? 1 : 1 - Math.pow(2, -base * t);
+        };
+        Easing.ExpInOut = function (t, base) {
+            if (base === void 0) { base = 10; }
+            if (t == 0)
+                return 0;
+            else if (t == 1)
+                return 1;
+            else {
+                if (t < 0.5) {
+                    return 0.5 * Math.pow(2, base * (2 * t - 1));
+                }
+                else {
+                    var _t = ((t - 0.5) * 2);
+                    return (1 - Math.pow(2, -base * _t)) / 2 + 0.5;
+                }
+            }
+        };
+        Easing.BackIn = function (t, s) {
+            if (s === void 0) { s = 1.70158; }
+            return t * t * ((s + 1) * t - s);
+        };
+        Easing.BackOut = function (t, s) {
+            if (s === void 0) { s = 1.70158; }
+            var _t = t - 1;
+            return _t * _t * ((s + 1) * _t + s) + 1;
+        };
+        Easing.BackInOut = function (t, s) {
+            if (s === void 0) { s = 1.70158; }
+            if (t < 0.5) {
+                var _t = t * 2;
+                return 0.5 * _t * _t * ((s + 1) * _t - s);
+            }
+            else {
+                var _t = ((t - 0.5) * 2) - 1;
+                return (_t * _t * ((s + 1) * _t + s) + 1) / 2 + 0.5;
             }
         };
         return Easing;
@@ -2259,13 +2582,33 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["UTILS"] = 8] = "UTILS";
     SHADERTYPE[SHADERTYPE["SKYBOX_VERTEX"] = 9] = "SKYBOX_VERTEX";
     SHADERTYPE[SHADERTYPE["SKYBOX_FRAG"] = 10] = "SKYBOX_FRAG";
+    SHADERTYPE[SHADERTYPE["CUBE_SH_VERT"] = 11] = "CUBE_SH_VERT";
+    SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 12] = "CUBE_SH_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
+;
+var SHADER_PROGRAM;
+(function (SHADER_PROGRAM) {
+    SHADER_PROGRAM[SHADER_PROGRAM["DEBUG"] = 0] = "DEBUG";
+    SHADER_PROGRAM[SHADER_PROGRAM["LAMBERT"] = 1] = "LAMBERT";
+    SHADER_PROGRAM[SHADER_PROGRAM["OREN_NAYAR"] = 2] = "OREN_NAYAR";
+    SHADER_PROGRAM[SHADER_PROGRAM["BLINN_PHONG"] = 3] = "BLINN_PHONG";
+    SHADER_PROGRAM[SHADER_PROGRAM["COOK_TORRANCE"] = 4] = "COOK_TORRANCE";
+    SHADER_PROGRAM[SHADER_PROGRAM["SKYBOX"] = 5] = "SKYBOX";
+    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 6] = "SHADOWMAP";
+    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 7] = "CUBE_SH";
+})(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
 (function (PASS) {
     PASS[PASS["SHADOW"] = 0] = "SHADOW";
     PASS[PASS["STANDARD_FORWARD"] = 1] = "STANDARD_FORWARD";
 })(PASS || (PASS = {}));
+;
+var IRRADIANCE_PASS;
+(function (IRRADIANCE_PASS) {
+    IRRADIANCE_PASS[IRRADIANCE_PASS["SH_COMPUTE"] = 0] = "SH_COMPUTE";
+    IRRADIANCE_PASS[IRRADIANCE_PASS["IRRADIANCE_COMPUTE"] = 1] = "IRRADIANCE_COMPUTE";
+})(IRRADIANCE_PASS || (IRRADIANCE_PASS = {}));
 ;
 var ShaderFile = (function () {
     function ShaderFile(source, loaded) {
@@ -2300,6 +2643,8 @@ var ShaderRepository = (function () {
         this.asyncLoadShader("utils.frag", SHADERTYPE.UTILS, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("skybox.vert", SHADERTYPE.SKYBOX_VERTEX, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("skybox.frag", SHADERTYPE.SKYBOX_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("cube-sh.vert", SHADERTYPE.CUBE_SH_VERT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("cube-sh.frag", SHADERTYPE.CUBE_SH_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
     };
     ShaderRepository.prototype.asyncLoadShader = function (name, stype, loaded) {
         var req = new XMLHttpRequest();
@@ -2354,6 +2699,18 @@ var ShaderLightProperties = (function () {
     }
     return ShaderLightProperties;
 })();
+var ShaderUniforms = (function () {
+    function ShaderUniforms() {
+    }
+    return ShaderUniforms;
+})();
+var ShaderProgramData = (function () {
+    function ShaderProgramData() {
+        this.program = null;
+        this.uniforms = new ShaderUniforms();
+    }
+    return ShaderProgramData;
+})();
 var Renderer = (function () {
     function Renderer(viewportElement, sr, backgroundColor) {
         if (backgroundColor === void 0) { backgroundColor = new gml.Vec4(0, 0, 0, 1); }
@@ -2372,43 +2729,68 @@ var Renderer = (function () {
             success = false;
         }
         this.shaderLODExtension = gl.getExtension("EXT_shader_texture_lod");
+        this.programData = [];
         // compile phong program
-        this.phongProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.BLINN_PHONG_FRAGMENT].source);
-        if (this.phongProgram == null) {
+        var phongProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.BLINN_PHONG_FRAGMENT].source);
+        if (phongProgram == null) {
             alert("Phong shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.lambertProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.LAMBERT_FRAGMENT].source);
-        if (this.lambertProgram == null) {
+        this.programData[SHADER_PROGRAM.BLINN_PHONG] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.BLINN_PHONG].program = phongProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.BLINN_PHONG);
+        var lambertProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.LAMBERT_FRAGMENT].source);
+        if (lambertProgram == null) {
             alert("Lambert shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.debugProgram = this.compileShaderProgram(sr.files[SHADERTYPE.DEBUG_VERTEX].source, sr.files[SHADERTYPE.DEBUG_FRAGMENT].source);
-        if (this.debugProgram == null) {
+        this.programData[SHADER_PROGRAM.LAMBERT] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.LAMBERT].program = lambertProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.LAMBERT);
+        var debugProgram = this.compileShaderProgram(sr.files[SHADERTYPE.DEBUG_VERTEX].source, sr.files[SHADERTYPE.DEBUG_FRAGMENT].source);
+        if (debugProgram == null) {
             alert("Debug shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.orenNayarProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.OREN_NAYAR_FRAGMENT].source);
-        if (this.orenNayarProgram == null) {
+        this.programData[SHADER_PROGRAM.DEBUG] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.DEBUG].program = debugProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.DEBUG);
+        var orenNayarProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.OREN_NAYAR_FRAGMENT].source);
+        if (orenNayarProgram == null) {
             alert("Oren-Nayar shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.cookTorranceProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT].source);
-        if (this.cookTorranceProgram == null) {
+        this.programData[SHADER_PROGRAM.OREN_NAYAR] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.OREN_NAYAR].program = orenNayarProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.OREN_NAYAR);
+        var cookTorranceProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT].source);
+        if (cookTorranceProgram == null) {
             alert("Cook-Torrance shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.skyboxProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKYBOX_FRAG].source);
-        if (this.skyboxProgram == null) {
+        this.programData[SHADER_PROGRAM.COOK_TORRANCE] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.COOK_TORRANCE].program = cookTorranceProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.COOK_TORRANCE);
+        var skyboxProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKYBOX_FRAG].source);
+        if (skyboxProgram == null) {
             alert("Skybox shader compilation failed. Please check the log for details.");
             success = false;
         }
+        this.programData[SHADER_PROGRAM.SKYBOX] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.SKYBOX].program = skyboxProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.SKYBOX);
+        var cubeMapSHProgram = this.compileShaderProgram(sr.files[SHADERTYPE.CUBE_SH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
+        if (cubeMapSHProgram == null) {
+            alert("Cube map shader compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.CUBE_SH] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.CUBE_SH].program = cubeMapSHProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.CUBE_SH);
         // initialize shadowmap textures
         {
             this.depthTextureExtension = gl.getExtension("WEBGL_depth_texture");
             var size = 64;
-            this.shadowFramebuffer = gl.createFramebuffer();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
             var shadowColorTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, shadowColorTexture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -2429,46 +2811,62 @@ var Renderer = (function () {
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowDepthTexture, 0);
             this.shadowmapSize = size;
         }
-        this.dirty = true;
-    }
-    Renderer.prototype.cacheLitShaderProgramLocations = function (program) {
-        var gl = this.context;
+        {
+            this.envMapSHTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, this.envMapSHTexture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 8, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            var sb = gl.createRenderbuffer();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, sb);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, 8, 1);
+            this.envMapSHFrameBuffer = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, this.envMapSHFrameBuffer);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.envMapSHTexture, 0);
+            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, sb);
+        }
         this.vertexBuffer = gl.createBuffer();
         this.vertexNormalBuffer = gl.createBuffer();
         this.vertexColorBuffer = gl.createBuffer();
         this.indexBuffer = gl.createBuffer();
-        this.aVertexPosition = gl.getAttribLocation(program, "aVertexPosition");
-        gl.enableVertexAttribArray(this.aVertexPosition);
-        this.aVertexNormal = gl.getAttribLocation(program, "aVertexNormal");
-        if (this.aVertexNormal >= 0) {
-            gl.enableVertexAttribArray(this.aVertexNormal);
+        this.dirty = true;
+    }
+    Renderer.prototype.cacheLitShaderProgramLocations = function (sp) {
+        var gl = this.context;
+        var program = this.programData[sp].program;
+        var uniforms = this.programData[sp].uniforms;
+        uniforms.aVertexPosition = gl.getAttribLocation(program, "aVertexPosition");
+        gl.enableVertexAttribArray(uniforms.aVertexPosition);
+        uniforms.aVertexNormal = gl.getAttribLocation(program, "aVertexNormal");
+        if (uniforms.aVertexNormal >= 0) {
+            gl.enableVertexAttribArray(uniforms.aVertexNormal);
         }
-        this.uModelView = gl.getUniformLocation(program, "uMVMatrix");
-        this.uModelToWorld = gl.getUniformLocation(program, "uMMatrix");
-        this.uPerspective = gl.getUniformLocation(program, "uPMatrix");
-        this.uNormalModelView = gl.getUniformLocation(program, "uNormalMVMatrix");
-        this.uNormalWorld = gl.getUniformLocation(program, "uNormalWorldMatrix");
-        this.uInverseProjection = gl.getUniformLocation(program, "uInverseProjectionMatrix");
-        this.uInverseView = gl.getUniformLocation(program, "uInverseViewMatrix");
-        this.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
-        this.uEnvMap = gl.getUniformLocation(program, "environment");
-        this.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
-        this.uEnvironmentMipMaps = gl.getUniformLocation(program, "environmentMipMaps");
-        this.uMaterial = new ShaderMaterialProperties();
-        this.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
-        this.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
-        this.uMaterial.specular = gl.getUniformLocation(program, "mat.specular");
-        this.uMaterial.emissive = gl.getUniformLocation(program, "mat.emissive");
-        this.uMaterial.shininess = gl.getUniformLocation(program, "mat.shininess");
-        this.uMaterial.roughness = gl.getUniformLocation(program, "mat.roughness");
-        this.uMaterial.fresnel = gl.getUniformLocation(program, "mat.fresnel");
-        this.uLights = [];
+        uniforms.uModelView = gl.getUniformLocation(program, "uMVMatrix");
+        uniforms.uModelToWorld = gl.getUniformLocation(program, "uMMatrix");
+        uniforms.uPerspective = gl.getUniformLocation(program, "uPMatrix");
+        uniforms.uNormalModelView = gl.getUniformLocation(program, "uNormalMVMatrix");
+        uniforms.uNormalWorld = gl.getUniformLocation(program, "uNormalWorldMatrix");
+        uniforms.uInverseProjection = gl.getUniformLocation(program, "uInverseProjectionMatrix");
+        uniforms.uInverseView = gl.getUniformLocation(program, "uInverseViewMatrix");
+        uniforms.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
+        uniforms.uEnvMap = gl.getUniformLocation(program, "environment");
+        uniforms.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
+        uniforms.uEnvironmentMipMaps = gl.getUniformLocation(program, "environmentMipMaps");
+        uniforms.uMaterial = new ShaderMaterialProperties();
+        uniforms.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
+        uniforms.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
+        uniforms.uMaterial.specular = gl.getUniformLocation(program, "mat.specular");
+        uniforms.uMaterial.emissive = gl.getUniformLocation(program, "mat.emissive");
+        uniforms.uMaterial.shininess = gl.getUniformLocation(program, "mat.shininess");
+        uniforms.uMaterial.roughness = gl.getUniformLocation(program, "mat.roughness");
+        uniforms.uMaterial.fresnel = gl.getUniformLocation(program, "mat.fresnel");
+        uniforms.uLights = [];
         for (var i = 0; i < 10; i++) {
-            this.uLights[i] = new ShaderLightProperties();
-            this.uLights[i].position = gl.getUniformLocation(program, "lights[" + i + "].position");
-            this.uLights[i].color = gl.getUniformLocation(program, "lights[" + i + "].color");
-            this.uLights[i].enabled = gl.getUniformLocation(program, "lights[" + i + "].enabled");
-            this.uLights[i].radius = gl.getUniformLocation(program, "lights[" + i + "].radius");
+            uniforms.uLights[i] = new ShaderLightProperties();
+            uniforms.uLights[i].position = gl.getUniformLocation(program, "lights[" + i + "].position");
+            uniforms.uLights[i].color = gl.getUniformLocation(program, "lights[" + i + "].color");
+            uniforms.uLights[i].enabled = gl.getUniformLocation(program, "lights[" + i + "].enabled");
+            uniforms.uLights[i].radius = gl.getUniformLocation(program, "lights[" + i + "].radius");
         }
     };
     Renderer.prototype.compileShaderProgram = function (vs, fs) {
@@ -2517,21 +2915,21 @@ var Renderer = (function () {
     Renderer.prototype.renderSceneEnvironment = function (gl, scene, mvStack) {
         // TODO unhardcode me
         var perspective = gml.makePerspective(gml.fromDegrees(45), 640.0 / 480.0, 0.1, 100.0);
-        gl.useProgram(this.skyboxProgram);
-        this.cacheLitShaderProgramLocations(this.skyboxProgram);
-        this.currentProgram = this.skyboxProgram;
+        gl.useProgram(this.programData[SHADER_PROGRAM.SKYBOX].program);
+        this.currentProgram = SHADER_PROGRAM.SKYBOX;
+        var locations = this.programData[SHADER_PROGRAM.SKYBOX].uniforms;
         var fullscreen = new Quad();
         fullscreen.rebuildRenderData();
         var inverseProjectionMatrix = perspective.invert();
-        gl.uniformMatrix4fv(this.uInverseProjection, false, inverseProjectionMatrix.m);
+        gl.uniformMatrix4fv(locations.uInverseProjection, false, inverseProjectionMatrix.m);
         var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
-        gl.uniformMatrix3fv(this.uInverseView, false, inverseViewMatrix.m);
+        gl.uniformMatrix3fv(locations.uInverseView, false, inverseViewMatrix.m);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.vertices, gl.STATIC_DRAW);
-        gl.vertexAttribPointer(this.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(locations.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
-        gl.uniform1i(this.uEnvMap, 0);
+        gl.uniform1i(locations.uEnvMap, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
@@ -2541,88 +2939,78 @@ var Renderer = (function () {
         var perspective = gml.makePerspective(gml.fromDegrees(45), 640.0 / 480.0, 0.1, 100.0);
         scene.renderables.forEach(function (p, i) {
             if (p.material instanceof BlinnPhongMaterial) {
-                if (_this.currentProgram != _this.phongProgram) {
-                    gl.useProgram(_this.phongProgram);
-                    _this.cacheLitShaderProgramLocations(_this.phongProgram);
-                    _this.currentProgram = _this.phongProgram;
-                }
+                gl.useProgram(_this.programData[SHADER_PROGRAM.BLINN_PHONG].program);
+                _this.currentProgram = SHADER_PROGRAM.BLINN_PHONG;
                 var blinnphong = p.material;
-                gl.uniform4fv(_this.uMaterial.diffuse, blinnphong.diffuse.v);
-                gl.uniform4fv(_this.uMaterial.ambient, blinnphong.ambient.v);
-                gl.uniform4fv(_this.uMaterial.specular, blinnphong.specular.v);
-                gl.uniform4fv(_this.uMaterial.emissive, blinnphong.emissive.v);
-                gl.uniform1f(_this.uMaterial.shininess, blinnphong.shininess);
+                var locations_1 = _this.programData[SHADER_PROGRAM.BLINN_PHONG].uniforms;
+                gl.uniform4fv(locations_1.uMaterial.diffuse, blinnphong.diffuse.v);
+                gl.uniform4fv(locations_1.uMaterial.ambient, blinnphong.ambient.v);
+                gl.uniform4fv(locations_1.uMaterial.specular, blinnphong.specular.v);
+                gl.uniform4fv(locations_1.uMaterial.emissive, blinnphong.emissive.v);
+                gl.uniform1f(locations_1.uMaterial.shininess, blinnphong.shininess);
             }
             else if (p.material instanceof DebugMaterial) {
-                if (_this.currentProgram != _this.debugProgram) {
-                    gl.useProgram(_this.debugProgram);
-                    _this.cacheLitShaderProgramLocations(_this.debugProgram);
-                    _this.currentProgram = _this.debugProgram;
-                }
+                gl.useProgram(_this.programData[SHADER_PROGRAM.DEBUG].program);
+                _this.currentProgram = SHADER_PROGRAM.DEBUG;
             }
             else if (p.material instanceof OrenNayarMaterial) {
-                if (_this.currentProgram != _this.orenNayarProgram) {
-                    gl.useProgram(_this.orenNayarProgram);
-                    _this.cacheLitShaderProgramLocations(_this.orenNayarProgram);
-                    _this.currentProgram = _this.orenNayarProgram;
-                }
+                gl.useProgram(_this.programData[SHADER_PROGRAM.OREN_NAYAR].program);
+                _this.currentProgram = SHADER_PROGRAM.OREN_NAYAR;
                 var orennayar = p.material;
-                gl.uniform4fv(_this.uMaterial.diffuse, orennayar.diffuse.v);
-                gl.uniform1f(_this.uMaterial.roughness, orennayar.roughness);
+                var locations_2 = _this.programData[SHADER_PROGRAM.OREN_NAYAR].uniforms;
+                gl.uniform4fv(locations_2.uMaterial.diffuse, orennayar.diffuse.v);
+                gl.uniform1f(locations_2.uMaterial.roughness, orennayar.roughness);
             }
             else if (p.material instanceof LambertMaterial) {
-                if (_this.currentProgram != _this.lambertProgram) {
-                    gl.useProgram(_this.lambertProgram);
-                    _this.cacheLitShaderProgramLocations(_this.lambertProgram);
-                    _this.currentProgram = _this.lambertProgram;
-                }
+                gl.useProgram(_this.programData[SHADER_PROGRAM.LAMBERT].program);
+                _this.currentProgram = SHADER_PROGRAM.LAMBERT;
                 var lambert = p.material;
-                gl.uniform4fv(_this.uMaterial.diffuse, lambert.diffuse.v);
+                var locations_3 = _this.programData[SHADER_PROGRAM.LAMBERT].uniforms;
+                gl.uniform4fv(locations_3.uMaterial.diffuse, lambert.diffuse.v);
             }
             else if (p.material instanceof CookTorranceMaterial) {
-                if (_this.currentProgram != _this.cookTorranceProgram) {
-                    gl.useProgram(_this.cookTorranceProgram);
-                    _this.cacheLitShaderProgramLocations(_this.cookTorranceProgram);
-                    _this.currentProgram = _this.cookTorranceProgram;
-                }
+                gl.useProgram(_this.programData[SHADER_PROGRAM.COOK_TORRANCE].program);
+                _this.currentProgram = SHADER_PROGRAM.COOK_TORRANCE;
                 var cooktorrance = p.material;
-                gl.uniform4fv(_this.uMaterial.diffuse, cooktorrance.diffuse.v);
-                gl.uniform4fv(_this.uMaterial.specular, cooktorrance.specular.v);
-                gl.uniform1f(_this.uMaterial.roughness, cooktorrance.roughness);
-                gl.uniform1f(_this.uMaterial.fresnel, cooktorrance.fresnel);
+                var locations_4 = _this.programData[SHADER_PROGRAM.COOK_TORRANCE].uniforms;
+                gl.uniform4fv(locations_4.uMaterial.diffuse, cooktorrance.diffuse.v);
+                gl.uniform4fv(locations_4.uMaterial.specular, cooktorrance.specular.v);
+                gl.uniform1f(locations_4.uMaterial.roughness, cooktorrance.roughness);
+                gl.uniform1f(locations_4.uMaterial.fresnel, cooktorrance.fresnel);
             }
+            var locations = _this.programData[_this.currentProgram].uniforms;
             scene.lights.forEach(function (l, i) {
                 var lightpos = mvStack[mvStack.length - 1].transform(l.position);
-                gl.uniform4fv(_this.uLights[i].position, lightpos.v);
-                gl.uniform4fv(_this.uLights[i].color, l.color.v);
-                gl.uniform1i(_this.uLights[i].enabled, l.enabled ? 1 : 0);
-                gl.uniform1f(_this.uLights[i].radius, l.radius);
+                gl.uniform4fv(locations.uLights[i].position, lightpos.v);
+                gl.uniform4fv(locations.uLights[i].color, l.color.v);
+                gl.uniform1i(locations.uLights[i].enabled, l.enabled ? 1 : 0);
+                gl.uniform1f(locations.uLights[i].radius, l.radius);
             });
-            gl.uniformMatrix4fv(_this.uPerspective, false, perspective.m);
+            gl.uniformMatrix4fv(locations.uPerspective, false, perspective.m);
             if (_this.camera != null) {
-                gl.uniform4fv(_this.uCameraPos, _this.camera.matrix.translation.v);
+                gl.uniform4fv(locations.uCameraPos, _this.camera.matrix.translation.v);
             }
             var primitiveModelView = mvStack[mvStack.length - 1].multiply(p.transform);
-            gl.uniformMatrix4fv(_this.uModelView, false, primitiveModelView.m);
-            gl.uniformMatrix4fv(_this.uModelToWorld, false, p.transform.m);
+            gl.uniformMatrix4fv(locations.uModelView, false, primitiveModelView.m);
+            gl.uniformMatrix4fv(locations.uModelToWorld, false, p.transform.m);
             // the normal matrix is defined as the upper 3x3 block of transpose( inverse( model-view ) )
             var normalMVMatrix = primitiveModelView.invert().transpose().mat3;
-            gl.uniformMatrix3fv(_this.uNormalModelView, false, normalMVMatrix.m);
+            gl.uniformMatrix3fv(locations.uNormalModelView, false, normalMVMatrix.m);
             var normalWorldMatrix = p.transform.invert().transpose().mat3;
-            gl.uniformMatrix3fv(_this.uNormalWorld, false, normalWorldMatrix.m);
+            gl.uniformMatrix3fv(locations.uNormalWorld, false, normalWorldMatrix.m);
             var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
-            gl.uniformMatrix3fv(_this.uInverseView, false, inverseViewMatrix.m);
+            gl.uniformMatrix3fv(locations.uInverseView, false, inverseViewMatrix.m);
             gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, p.renderData.vertices, gl.STATIC_DRAW);
-            gl.vertexAttribPointer(_this.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.vertexAttribPointer(locations.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _this.indexBuffer);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, p.renderData.indices, gl.STATIC_DRAW);
             gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexNormalBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, p.renderData.normals, gl.STATIC_DRAW);
-            gl.vertexAttribPointer(_this.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
-            gl.uniform1i(_this.uEnvMap, 0);
-            gl.uniform1f(_this.uEnvironmentMipMaps, 7);
-            gl.uniform1i(_this.uIrradianceMap, 1);
+            gl.vertexAttribPointer(locations.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
+            gl.uniform1i(locations.uEnvMap, 0);
+            gl.uniform1f(locations.uEnvironmentMipMaps, 7);
+            gl.uniform1i(locations.uIrradianceMap, 1);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
             gl.activeTexture(gl.TEXTURE1);
@@ -2637,6 +3025,53 @@ var Renderer = (function () {
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     };
+    Renderer.prototype.renderIrradianceFromScene = function (gl, scene, pass) {
+        gl.useProgram(this.programData[SHADER_PROGRAM.CUBE_SH].program);
+        this.currentProgram = SHADER_PROGRAM.CUBE_SH;
+        var fullscreen = new Quad();
+        fullscreen.rebuildRenderData();
+        var locations = this.programData[this.currentProgram].uniforms;
+        gl.uniformMatrix4fv(locations.uModelView, false, gml.Mat4.identity().m);
+        gl.uniformMatrix3fv(locations.uNormalModelView, false, gml.Mat3.identity().m);
+        gl.uniformMatrix4fv(locations.uPerspective, false, gml.Mat4.identity().m);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.vertices, gl.STATIC_DRAW);
+        gl.vertexAttribPointer(locations.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
+        gl.uniform1i(locations.uEnvMap, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environment.cubeMapTexture);
+        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
+    };
+    Renderer.prototype.renderIrradiance = function () {
+        var gl = this.context;
+        if (gl) {
+            var scene = Scene.getActiveScene();
+            if (scene) {
+                // SET UP ENVIRONMENT MAP
+                var cubeMapTexture = null;
+                if (scene.environment != null && scene.environment.loaded && scene.environment.cubeMapTexture == null) {
+                    var cubeMapTexture_1 = gl.createTexture();
+                    gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_1);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_X, scene.environment.faces[CUBEMAPTYPE.POS_X]);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, scene.environment.faces[CUBEMAPTYPE.NEG_X]);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, scene.environment.faces[CUBEMAPTYPE.POS_Y]);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, scene.environment.faces[CUBEMAPTYPE.NEG_Y]);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, scene.environment.faces[CUBEMAPTYPE.POS_Z]);
+                    this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, scene.environment.faces[CUBEMAPTYPE.NEG_Z]);
+                    gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+                    scene.environment.cubeMapTexture = cubeMapTexture_1;
+                }
+                //
+                // COMPUTE SH COEFFICIENTS
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0, 0, 8, 1);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                this.renderIrradianceFromScene(gl, scene, IRRADIANCE_PASS.SH_COMPUTE);
+            }
+        }
+    };
     Renderer.prototype.render = function () {
         var gl = this.context;
         if (gl) {
@@ -2649,8 +3084,8 @@ var Renderer = (function () {
                     // SET UP ENVIRONMENT MAP
                     var cubeMapTexture = null;
                     if (scene.environment != null && scene.environment.loaded && scene.environment.cubeMapTexture == null) {
-                        var cubeMapTexture_1 = gl.createTexture();
-                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_1);
+                        var cubeMapTexture_2 = gl.createTexture();
+                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_2);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_X, scene.environment.faces[CUBEMAPTYPE.POS_X]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, scene.environment.faces[CUBEMAPTYPE.NEG_X]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, scene.environment.faces[CUBEMAPTYPE.POS_Y]);
@@ -2658,14 +3093,14 @@ var Renderer = (function () {
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, scene.environment.faces[CUBEMAPTYPE.POS_Z]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, scene.environment.faces[CUBEMAPTYPE.NEG_Z]);
                         gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-                        scene.environment.cubeMapTexture = cubeMapTexture_1;
+                        scene.environment.cubeMapTexture = cubeMapTexture_2;
                     }
                     //
                     // SET UP IRRADIANCE MAP
                     var irradianceTexture = null;
                     if (scene.irradiance != null && scene.irradiance.loaded && scene.irradiance.cubeMapTexture == null) {
-                        var cubeMapTexture_2 = gl.createTexture();
-                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_2);
+                        var cubeMapTexture_3 = gl.createTexture();
+                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapTexture_3);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_X, scene.irradiance.faces[CUBEMAPTYPE.POS_X]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, scene.irradiance.faces[CUBEMAPTYPE.NEG_X]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, scene.irradiance.faces[CUBEMAPTYPE.POS_Y]);
@@ -2673,7 +3108,7 @@ var Renderer = (function () {
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, scene.irradiance.faces[CUBEMAPTYPE.POS_Z]);
                         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, scene.irradiance.faces[CUBEMAPTYPE.NEG_Z]);
                         gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-                        scene.irradiance.cubeMapTexture = cubeMapTexture_2;
+                        scene.irradiance.cubeMapTexture = cubeMapTexture_3;
                     }
                     var mvStack = [];
                     if (this.camera != null) {
