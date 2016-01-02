@@ -44,19 +44,25 @@ var gml;
                 args[_i - 1] = arguments[_i];
             }
             this.size = size;
-            if (args.length === 1) {
-                if (args[0] instanceof Float32Array) {
-                    this.v = args[0];
+            this.v = new Float32Array(size);
+            if (args.length === 0) {
+                return;
+            }
+            else if (args.length === 1) {
+                var arr = args[0];
+                if (arr instanceof Float32Array) {
+                    this.v.set(arr);
                 }
-                else if (args[0] instanceof Array) {
-                    this.v = new Float32Array(args[0]);
+                else if (arr instanceof Array) {
+                    for (var i = 0; i < size; i++) {
+                        this.v[i] = arr[i];
+                    }
                 }
             }
             else {
-                this.v = new Float32Array(args);
-            }
-            if (this.v.length != this.size) {
-                console.warn("input array " + args + " is not " + this.size + " elements long!");
+                for (var i = 0; i < size; i++) {
+                    this.v[i] = args[i];
+                }
             }
         }
         Vector.prototype.add = function (rhs) {
@@ -162,7 +168,7 @@ var gml;
             configurable: true
         });
         Vector.prototype.map = function (callback) {
-            return new Vector(this.size, this.v.map(callback));
+            return new Vector(this.size, Array.prototype.slice.call(this.v).map(callback));
         };
         Vector.prototype.toString = function () {
             var str = "";
@@ -186,19 +192,26 @@ var gml;
             }
             this.rows = rows;
             this.cols = cols;
-            if (args.length == 1) {
-                if (args[0] instanceof Float32Array) {
-                    this.v = args[0];
+            var size = rows * cols;
+            this.v = new Float32Array(size);
+            if (args.length == 0) {
+                return;
+            }
+            else if (args.length == 1) {
+                var arr = args[0];
+                if (arr instanceof Float32Array) {
+                    this.v = arr;
                 }
-                else if (args[0] instanceof Array) {
-                    this.v = new Float32Array(args[0]);
+                else if (arr instanceof Array) {
+                    for (var i = 0; i < size; i++) {
+                        this.v[i] = arr[i];
+                    }
                 }
             }
             else {
-                this.v = new Float32Array(args);
-            }
-            if (this.v.length != this.rows * this.cols) {
-                console.warn("input values " + args + " is not " + this.rows * this.cols + " elements long!");
+                for (var i = 0; i < size; i++) {
+                    this.v[i] = args[i];
+                }
             }
         }
         Matrix.prototype.transpose_Float32Array = function (values, rows, cols) {
@@ -751,7 +764,7 @@ var gml2d;
             return this.x * rhs.y - this.y * rhs.x;
         };
         Vec2.prototype.map = function (callback) {
-            return new Vec2(this.v.map(callback));
+            return new Vec2(callback(this.v[0]), callback(this.v[1]));
         };
         Vec2.randomInCircle = function (radius) {
             if (radius === void 0) { radius = 1; }
@@ -852,7 +865,7 @@ var gml2d;
             configurable: true
         });
         Vec3.prototype.map = function (callback) {
-            return new Vec3(this.v.map(callback));
+            return new Vec3(callback(this.v[0]), callback(this.v[1]), callback(this.v[2]));
         };
         /**
          * @returns a random directional Vec3 in a user-specified circle centered around the origin.
@@ -893,11 +906,29 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
+            _super.call(this, 3, 3);
             if (args.length === 1) {
-                _super.call(this, 3, 3, args[0]);
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
+                this.v[2] = arr[2];
+                this.v[3] = arr[3];
+                this.v[4] = arr[4];
+                this.v[5] = arr[5];
+                this.v[6] = arr[6];
+                this.v[7] = arr[7];
+                this.v[8] = arr[8];
             }
             else {
-                _super.call(this, 3, 3, args);
+                this.v[0] = args[0];
+                this.v[1] = args[1];
+                this.v[2] = args[2];
+                this.v[3] = args[3];
+                this.v[4] = args[4];
+                this.v[5] = args[5];
+                this.v[6] = args[6];
+                this.v[7] = args[7];
+                this.v[8] = args[8];
             }
         }
         Object.defineProperty(Mat3.prototype, "r00", {
@@ -1026,6 +1057,28 @@ var gml;
         Mat3.prototype.transform = function (rhs) {
             return new gml.Vec3(this.r00 * rhs.x + this.r01 * rhs.y + this.r02 * rhs.z, this.r10 * rhs.x + this.r11 * rhs.y + this.r12 * rhs.z, this.r20 * rhs.x + this.r21 * rhs.y + this.r22 * rhs.z);
         };
+        Object.defineProperty(Mat3.prototype, "determinant", {
+            /**
+             * @returns the determinant of this 3x3 matrix.
+             *
+             * Hand expanded for speed and to avoid call to Mat.LU, which is unoptimized and
+             * expensive for real-time applications.
+             */
+            get: function () {
+                var m00 = this.v[0];
+                var m01 = this.v[1];
+                var m02 = this.v[2];
+                var m10 = this.v[3];
+                var m11 = this.v[4];
+                var m12 = this.v[5];
+                var m20 = this.v[6];
+                var m21 = this.v[7];
+                var m22 = this.v[8];
+                return m00 * m11 * m22 - m00 * m12 * m21 + m01 * m12 * m20 - m01 * m10 * m22;
+            },
+            enumerable: true,
+            configurable: true
+        });
         /**
          * constructs a Mat4 with the contents of this Mat3 forming the top-left
          * portion of the new Mat4. The translation portion of the new Mat4 is assumed
@@ -1105,11 +1158,43 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
+            _super.call(this, 4, 4);
             if (args.length === 1) {
-                _super.call(this, 4, 4, args[0]);
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
+                this.v[2] = arr[2];
+                this.v[3] = arr[3];
+                this.v[4] = arr[4];
+                this.v[5] = arr[5];
+                this.v[6] = arr[6];
+                this.v[7] = arr[7];
+                this.v[8] = arr[8];
+                this.v[9] = arr[9];
+                this.v[10] = arr[10];
+                this.v[11] = arr[11];
+                this.v[12] = arr[12];
+                this.v[13] = arr[13];
+                this.v[14] = arr[14];
+                this.v[15] = arr[15];
             }
             else {
-                _super.call(this, 4, 4, args);
+                this.v[0] = args[0];
+                this.v[1] = args[1];
+                this.v[2] = args[2];
+                this.v[3] = args[3];
+                this.v[4] = args[4];
+                this.v[5] = args[5];
+                this.v[6] = args[6];
+                this.v[7] = args[7];
+                this.v[8] = args[8];
+                this.v[9] = args[9];
+                this.v[10] = args[10];
+                this.v[11] = args[11];
+                this.v[12] = args[12];
+                this.v[13] = args[13];
+                this.v[14] = args[14];
+                this.v[15] = args[15];
             }
         }
         Object.defineProperty(Mat4.prototype, "r00", {
@@ -1339,22 +1424,33 @@ var gml;
             return new gml.Vec4(this.r00 * rhs.x + this.r01 * rhs.y + this.r02 * rhs.z + this.tx * rhs.w, this.r10 * rhs.x + this.r11 * rhs.y + this.r12 * rhs.z + this.ty * rhs.w, this.r20 * rhs.x + this.r21 * rhs.y + this.r22 * rhs.z + this.tz * rhs.w, this.m30 * rhs.x + this.m31 * rhs.y + this.m32 * rhs.z + this.m33 * rhs.w);
         };
         Mat4.prototype.invert = function () {
-            var d = this.determinant;
-            var tr = this.trace;
-            var m2 = this.multiply(this);
-            var m3 = this.multiply(m2);
-            var tr2 = m2.trace;
-            var tr3 = m3.trace;
-            var a = (1 / 6) * ((tr * tr * tr) - (3 * tr * tr2) + (2 * tr3));
-            var b = (1 / 2) * (tr * tr - tr2);
-            var c = m2.scalarmul(tr).subtract(m3);
-            return Mat4.identity().scalarmul(a).subtract(this.scalarmul(b)).add(c).scalarmul(1 / d);
+            var m00 = this.v[0];
+            var m01 = this.v[1];
+            var m02 = this.v[2];
+            var m03 = this.v[3];
+            var m10 = this.v[4];
+            var m11 = this.v[5];
+            var m12 = this.v[6];
+            var m13 = this.v[7];
+            var m20 = this.v[8];
+            var m21 = this.v[9];
+            var m22 = this.v[10];
+            var m23 = this.v[11];
+            var m30 = this.v[12];
+            var m31 = this.v[13];
+            var m32 = this.v[14];
+            var m33 = this.v[15];
+            var det = this.determinant;
+            if (det == 0)
+                return Mat4.identity(); // fail
+            var f = 1 / det;
+            return new Mat4(f * -m13 * m22 * m31 + f * m12 * m23 * m31 + f * m13 * m21 * m32 - f * m11 * m23 * m32 - f * m12 * m21 * m33 + f * m11 * m22 * m33, f * m03 * m22 * m31 - f * m02 * m23 * m31 - f * m03 * m21 * m32 + f * m01 * m23 * m32 + f * m02 * m21 * m33 - f * m01 * m22 * m33, f * -m03 * m12 * m31 + f * m02 * m13 * m31 + f * m03 * m11 * m32 - f * m01 * m13 * m32 - f * m02 * m11 * m33 + f * m01 * m12 * m33, f * m03 * m12 * m21 - f * m02 * m13 * m21 - f * m03 * m11 * m22 + f * m01 * m13 * m22 + f * m02 * m11 * m23 - f * m01 * m12 * m23, f * m13 * m22 * m30 - f * m12 * m23 * m30 - f * m13 * m20 * m32 + f * m10 * m23 * m32 + f * m12 * m20 * m33 - f * m10 * m22 * m33, f * -m03 * m22 * m30 + f * m02 * m23 * m30 + f * m03 * m20 * m32 - f * m00 * m23 * m32 - f * m02 * m20 * m33 + f * m00 * m22 * m33, f * m03 * m12 * m30 - f * m02 * m13 * m30 - f * m03 * m10 * m32 + f * m00 * m13 * m32 + f * m02 * m10 * m33 - f * m00 * m12 * m33, f * -m03 * m12 * m20 + f * m02 * m13 * m20 + f * m03 * m10 * m22 - f * m00 * m13 * m22 - f * m02 * m10 * m23 + f * m00 * m12 * m23, f * -m13 * m21 * m30 + f * m11 * m23 * m30 + f * m13 * m20 * m31 - f * m10 * m23 * m31 - f * m11 * m20 * m33 + f * m10 * m21 * m33, f * m03 * m21 * m30 - f * m01 * m23 * m30 - f * m03 * m20 * m31 + f * m00 * m23 * m31 + f * m01 * m20 * m33 - f * m00 * m21 * m33, f * -m03 * m11 * m30 + f * m01 * m13 * m30 + f * m03 * m10 * m31 - f * m00 * m13 * m31 - f * m01 * m10 * m33 + f * m00 * m11 * m33, f * m03 * m11 * m20 - f * m01 * m13 * m20 - f * m03 * m10 * m21 + f * m00 * m13 * m21 + f * m01 * m10 * m23 - f * m00 * m11 * m23, f * m12 * m21 * m30 - f * m11 * m22 * m30 - f * m12 * m20 * m31 + f * m10 * m22 * m31 + f * m11 * m20 * m32 - f * m10 * m21 * m32, f * -m02 * m21 * m30 + f * m01 * m22 * m30 + f * m02 * m20 * m31 - f * m00 * m22 * m31 - f * m01 * m20 * m32 + f * m00 * m21 * m32, f * m02 * m11 * m30 - f * m01 * m12 * m30 - f * m02 * m10 * m31 + f * m00 * m12 * m31 + f * m01 * m10 * m32 - f * m00 * m11 * m32, f * -m02 * m11 * m20 + f * m01 * m12 * m20 + f * m02 * m10 * m21 - f * m00 * m12 * m21 - f * m01 * m10 * m22 + f * m00 * m11 * m22);
         };
         Object.defineProperty(Mat4.prototype, "determinant", {
             /**
-             * @returns the determinant of Mat4.
+             * @returns the determinant of this 4x4 matrix.
              *
-             * Hand-rolled for Mat4 to avoid call to Mat.LU, which is unoptimized and
+             * Hand expanded for speed and to avoid call to Mat.LU, which is unoptimized and
              * expensive for real-time applications.
              */
             get: function () {
@@ -1521,11 +1617,15 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
+            _super.call(this, 2);
             if (args.length == 2) {
-                _super.call(this, 2, args[0], args[1]);
+                this.v[0] = args[0];
+                this.v[1] = args[1];
             }
             else if (args.length == 1) {
-                _super.call(this, 2, args[0]);
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
             }
         }
         Object.defineProperty(Vec2.prototype, "x", {
@@ -1575,7 +1675,7 @@ var gml;
             configurable: true
         });
         Vec2.prototype.map = function (callback) {
-            return new Vec2(this.v.map(callback));
+            return new Vec2(callback(this.v[0]), callback(this.v[1]));
         };
         Vec2.randomInCircle = function (radius) {
             if (radius === void 0) { radius = 1; }
@@ -1602,11 +1702,17 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
+            _super.call(this, 3);
             if (args.length == 3) {
-                _super.call(this, 3, args[0], args[1], args[2]);
+                this.v[0] = args[0];
+                this.v[1] = args[1];
+                this.v[2] = args[2];
             }
             else if (args.length == 1) {
-                _super.call(this, 3, args[0]);
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
+                this.v[2] = arr[2];
             }
         }
         Object.defineProperty(Vec3.prototype, "x", {
@@ -1706,7 +1812,7 @@ var gml;
             configurable: true
         });
         Vec3.prototype.map = function (callback) {
-            return new Vec3(this.v.map(callback));
+            return new Vec3(callback(this.v[0]), callback(this.v[1]), callback(this.v[2]));
         };
         Vec3.randomInSphere = function (radius) {
             if (radius === void 0) { radius = 1; }
@@ -1733,11 +1839,19 @@ var gml;
             for (var _i = 0; _i < arguments.length; _i++) {
                 args[_i - 0] = arguments[_i];
             }
+            _super.call(this, 4);
             if (args.length == 4) {
-                _super.call(this, 4, args[0], args[1], args[2], args[3]);
+                this.v[0] = args[0];
+                this.v[1] = args[1];
+                this.v[2] = args[2];
+                this.v[3] = args[3];
             }
             else if (args.length == 1) {
-                _super.call(this, 4, args[0]);
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
+                this.v[2] = arr[2];
+                this.v[3] = arr[3];
             }
         }
         Object.defineProperty(Vec4.prototype, "x", {
@@ -1871,7 +1985,7 @@ var gml;
             configurable: true
         });
         Vec4.prototype.map = function (callback) {
-            return new Vec4(this.v.map(callback));
+            return new Vec4(callback(this.v[0]), callback(this.v[1]), callback(this.v[2]), callback(this.v[3]));
         };
         /**
          * @returns a random directional Vec4 in a user-specified sphere centered around (0, 0, 0).
@@ -2579,11 +2693,12 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["DEBUG_FRAGMENT"] = 5] = "DEBUG_FRAGMENT";
     SHADERTYPE[SHADERTYPE["OREN_NAYAR_FRAGMENT"] = 6] = "OREN_NAYAR_FRAGMENT";
     SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT"] = 7] = "COOK_TORRANCE_FRAGMENT";
-    SHADERTYPE[SHADERTYPE["UTILS"] = 8] = "UTILS";
-    SHADERTYPE[SHADERTYPE["SKYBOX_VERTEX"] = 9] = "SKYBOX_VERTEX";
-    SHADERTYPE[SHADERTYPE["SKYBOX_FRAG"] = 10] = "SKYBOX_FRAG";
-    SHADERTYPE[SHADERTYPE["CUBE_SH_VERT"] = 11] = "CUBE_SH_VERT";
-    SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 12] = "CUBE_SH_FRAG";
+    SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT_NO_EXT"] = 8] = "COOK_TORRANCE_FRAGMENT_NO_EXT";
+    SHADERTYPE[SHADERTYPE["UTILS"] = 9] = "UTILS";
+    SHADERTYPE[SHADERTYPE["SKYBOX_VERTEX"] = 10] = "SKYBOX_VERTEX";
+    SHADERTYPE[SHADERTYPE["SKYBOX_FRAG"] = 11] = "SKYBOX_FRAG";
+    SHADERTYPE[SHADERTYPE["CUBE_SH_VERT"] = 12] = "CUBE_SH_VERT";
+    SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 13] = "CUBE_SH_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
@@ -2640,6 +2755,7 @@ var ShaderRepository = (function () {
         this.asyncLoadShader("debug.frag", SHADERTYPE.DEBUG_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("oren-nayar.frag", SHADERTYPE.OREN_NAYAR_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("cook-torrance.frag", SHADERTYPE.COOK_TORRANCE_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("cook-torrance-legacy.frag", SHADERTYPE.COOK_TORRANCE_FRAGMENT_NO_EXT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("utils.frag", SHADERTYPE.UTILS, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("skybox.vert", SHADERTYPE.SKYBOX_VERTEX, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("skybox.frag", SHADERTYPE.SKYBOX_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
@@ -2763,7 +2879,13 @@ var Renderer = (function () {
         this.programData[SHADER_PROGRAM.OREN_NAYAR] = new ShaderProgramData();
         this.programData[SHADER_PROGRAM.OREN_NAYAR].program = orenNayarProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.OREN_NAYAR);
-        var cookTorranceProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT].source);
+        var cookTorranceProgram = null;
+        if (this.shaderLODExtension != null) {
+            cookTorranceProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT].source);
+        }
+        else {
+            cookTorranceProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT_NO_EXT].source);
+        }
         if (cookTorranceProgram == null) {
             alert("Cook-Torrance shader compilation failed. Please check the log for details.");
             success = false;
