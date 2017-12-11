@@ -2688,18 +2688,20 @@ var OrenNayarMaterial = (function (_super) {
 ///<reference path='material.ts' />
 var WaterMaterial = (function (_super) {
     __extends(WaterMaterial, _super);
-    function WaterMaterial(ambient, diffuse, specular, emissive, shininess) {
+    function WaterMaterial(ambient, diffuse, specular, emissive, shininess, screenspace) {
         if (ambient === void 0) { ambient = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (diffuse === void 0) { diffuse = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (specular === void 0) { specular = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (emissive === void 0) { emissive = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (shininess === void 0) { shininess = 1.0; }
+        if (screenspace === void 0) { screenspace = false; }
         _super.call(this);
         this.ambient = ambient;
         this.diffuse = diffuse;
         this.specular = specular;
         this.emissive = emissive;
         this.shininess = shininess;
+        this.screenspace = screenspace;
     }
     return WaterMaterial;
 }(Material));
@@ -3790,7 +3792,7 @@ var Quad = (function (_super) {
             var quadVertexIndices = [
                 0, 1, 2, 0, 2, 3,
             ];
-            this.renderData.indices = new Uint16Array(quadVertexIndices);
+            this.renderData.indices = new Uint32Array(quadVertexIndices);
         }
     };
     return Quad;
@@ -3871,7 +3873,9 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 13] = "CUBE_SH_FRAG";
     SHADERTYPE[SHADERTYPE["PASSTHROUGH_VERT"] = 14] = "PASSTHROUGH_VERT";
     SHADERTYPE[SHADERTYPE["WATER_VERT"] = 15] = "WATER_VERT";
-    SHADERTYPE[SHADERTYPE["WATER_FRAG"] = 16] = "WATER_FRAG";
+    SHADERTYPE[SHADERTYPE["SS_QUAD_VERT"] = 16] = "SS_QUAD_VERT";
+    SHADERTYPE[SHADERTYPE["WATER_FRAG"] = 17] = "WATER_FRAG";
+    SHADERTYPE[SHADERTYPE["WATER_SS_FRAG"] = 18] = "WATER_SS_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
@@ -3885,8 +3889,9 @@ var SHADER_PROGRAM;
     SHADER_PROGRAM[SHADER_PROGRAM["SKYBOX"] = 6] = "SKYBOX";
     SHADER_PROGRAM[SHADER_PROGRAM["SKY"] = 7] = "SKY";
     SHADER_PROGRAM[SHADER_PROGRAM["WATER"] = 8] = "WATER";
-    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 9] = "SHADOWMAP";
-    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 10] = "CUBE_SH";
+    SHADER_PROGRAM[SHADER_PROGRAM["WATER_SS"] = 9] = "WATER_SS";
+    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 10] = "SHADOWMAP";
+    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 11] = "CUBE_SH";
 })(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
@@ -3940,6 +3945,8 @@ var ShaderRepository = (function () {
         this.asyncLoadShader("passthrough.vert", SHADERTYPE.PASSTHROUGH_VERT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("water.vert", SHADERTYPE.WATER_VERT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("water.frag", SHADERTYPE.WATER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("screenspacequad.vert", SHADERTYPE.SS_QUAD_VERT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("water_screenspace.frag", SHADERTYPE.WATER_SS_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
     };
     ShaderRepository.prototype.asyncLoadShader = function (name, stype, loaded) {
         var req = new XMLHttpRequest();
@@ -4017,6 +4024,8 @@ var Renderer = (function () {
         gl.clearDepth(1.0); // Clear everything
         gl.enable(gl.DEPTH_TEST); // Enable depth testing
         gl.depthFunc(gl.LEQUAL); // Near things obscure far things
+        gl.enable(gl.BLEND); // Enable blending
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         this.context = gl;
         var success = true;
         if (!this.context) {
@@ -4097,6 +4106,14 @@ var Renderer = (function () {
         this.programData[SHADER_PROGRAM.WATER] = new ShaderProgramData();
         this.programData[SHADER_PROGRAM.WATER].program = waterProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER);
+        var waterSSProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.WATER_SS_FRAG].source);
+        if (waterSSProgram == null) {
+            alert("Screenspace water compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.WATER_SS] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.WATER_SS].program = waterSSProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER_SS);
         var cubeMapSHProgram = this.compileShaderProgram(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         if (cubeMapSHProgram == null) {
             alert("Cube map shader compilation failed. Please check the log for details.");
@@ -4245,7 +4262,7 @@ var Renderer = (function () {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environmentMap.cubeMapTexture);
         }
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
         var _this = this;
@@ -4287,9 +4304,18 @@ var Renderer = (function () {
                 gl.uniform1f(shaderVariables_4.uMaterial.fresnel, cooktorrance.fresnel);
             }
             else if (p.material instanceof WaterMaterial) {
-                _this.useProgram(gl, SHADER_PROGRAM.WATER);
-                var shaderVariables_5 = _this.programData[_this.currentProgram].uniforms;
-                gl.uniform1f(shaderVariables_5.uTime, scene.time);
+                if (p.material.screenspace) {
+                    _this.useProgram(gl, SHADER_PROGRAM.WATER_SS);
+                    var shaderVariables_5 = _this.programData[_this.currentProgram].uniforms;
+                    gl.uniform1f(shaderVariables_5.uTime, scene.time);
+                    var inverseProjectionMatrix = perspective.invert();
+                    gl.uniformMatrix4fv(shaderVariables_5.uInverseProjection, false, inverseProjectionMatrix.m);
+                }
+                else {
+                    _this.useProgram(gl, SHADER_PROGRAM.WATER);
+                    var shaderVariables_6 = _this.programData[_this.currentProgram].uniforms;
+                    gl.uniform1f(shaderVariables_6.uTime, scene.time);
+                }
             }
             var shaderVariables = _this.programData[_this.currentProgram].uniforms;
             scene.lights.forEach(function (l, i) {
@@ -4765,14 +4791,14 @@ function StartSky() {
     if (app == null) {
         var params = {
             vp: document.getElementById("big-viewport"),
-            orbitCenter: new gml.Vec4(0, 50, 0, 1),
-            orbitDistance: 30
+            orbitCenter: new gml.Vec4(0, 5, 0, 1),
+            orbitDistance: 0.001
         };
         shaderRepo = new ShaderRepository(function (repo) { app = new SkyApp(params, repo); });
         skyScene = new Scene(null, null);
         Scene.setActiveScene(skyScene);
         // ocean
-        skyScene.addRenderable(new InfinitePlane(500, new gml.Vec4(0, 30, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 8, v: 8 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+        skyScene.addRenderable(new InfinitePlane(250, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 8, v: 8 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
     }
 }
 //# sourceMappingURL=app.js.map
