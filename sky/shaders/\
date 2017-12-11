@@ -15,13 +15,13 @@ uniform float environmentMipMaps;
 
 const   float sun_size = sqrt( 1.0 / 3.0 );  // radius of sun sphere
 const   vec3  sea_base_color  = vec3(0.1,0.19,0.22);
-const   vec3  sea_water_color = vec3(0.8,0.9,0.6);
+const   vec3  sea_water_color = vec3(0.15,0.9,0.8);
+const   float sea_height      = 1.2;
 
 const float sea_speed = 3.0;
-const float sea_choppiness = 4.0;
-const float sea_frequency = 0.06;
-const float sea_amplitude = 0.6;
-const float sea_scale = 0.1;
+const float sea_choppiness = 1.0;
+const float sea_frequency = 0.15;
+const float sea_amplitude = 2.0;
 
 float diffuse( vec3 normal, vec3 light, float p ) {
     return pow( dot( normal, light ) * 0.4 + 0.6, p );
@@ -120,9 +120,9 @@ float get_specular( vec3 n, vec3 l, vec3 e, float s ) {
 
 void main( void ) {
     vec3 view = normalize( -( vPosition.xyz / vPosition.w ) );
-    vec3 normal = normalize( uNormalMVMatrix * get_normal( vPosition_World.xz * sea_scale, 0.1 ) );
+    vec3 normal = normalize( uNormalMVMatrix * get_normal( vPosition_World.xz, 0.1 ) );
 
-    vec3 reflected = uInverseViewMatrix * ( -reflect( view, normal ) );
+    mediump vec3 reflected = uInverseViewMatrix * ( -reflect( view, normal ) );
     vec4 ibl_specular = textureCube( environment, reflected ) * 0.9;
     
     vec3 lightdir = normalize( uVMatrix * vec4( vec3( sun_size ), 0 ) ).xyz;
@@ -130,17 +130,17 @@ void main( void ) {
     vec4 refracted = vec4( sea_base_color + diffuse( normal, lightdir, 80.0 ) * sea_water_color * 0.12, 1.0 ); 
 
     float fresnel = 1.0 - max(dot(normal,-view),0.0);
-    fresnel = pow(fresnel,3.0) * 0.65;
+    fresnel = pow(fresnel,3.0) * 0.7;
     
     vec4 color = mix( refracted, ibl_specular, fresnel );
 
     float dist = length( cPosition_World.xz - vPosition_World.xz );
     float atten = max( 1.0 - dot( dist, dist ) * 0.0000015, 0.0 );
 
-    // foam
-    color += vec4( sea_water_color * ( height_detailed( vPosition_World.xz * sea_scale ) ) * 0.05 * atten, 1.0 );
-
-    color += vec4( get_specular( normal, lightdir, view, 60.0 ) );
+    color += vec4( sea_water_color * ( height_detailed( vPosition_World.xz ) ) * 0.05 * atten, 1.0 );
+    
+    // bteitler: Apply specular highlight
+    color += vec4( get_specular( normal, lightdir, view, 90.0 ) ) * 0.5;
 
     gl_FragColor = color;
 }

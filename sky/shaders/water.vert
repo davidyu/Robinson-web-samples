@@ -13,12 +13,12 @@ uniform mediump float uTime;
 varying mediump vec3 vDirection;
 varying mediump vec4 vPosition;
 varying mediump vec4 vPosition_World;
-varying mediump vec3 vNormal;
 
 const float sea_speed = 3.0;
-const float sea_choppiness = 1.0;
-const float sea_frequency = 0.15;
-const float sea_amplitude = 1.2;
+const float sea_choppiness = 4.0;
+const float sea_frequency = 0.06;
+const float sea_amplitude = 0.6;
+const float sea_scale = 0.1;
 
 // based on Shadertoy "Seascape" entry by TDM
 
@@ -134,16 +134,15 @@ void main() {
 
     // transform from local to world
     vPosition = uMMatrix * vPosition;
-    vPosition.y += height( vPosition.xz );
+
+    // apply water noise height offset
+    vPosition.y = 5.0 * height( vPosition.xz * sea_scale );
+
+    // cache world position
     vPosition_World = vPosition;
 
     // then world to eye
     vPosition = uVMatrix * vPosition;
-
-    vNormal = uNormalMVMatrix * aVertexNormal;
-
-    // reproduce the eye/camera aim, per vertex, which is automatically interpolated to be per-pixel when we're in the fragment shader
-    vDirection = uInverseViewMatrix * ( uInverseProjectionMatrix * vec4( aVertexPosition, 1.0 ) ).xyz;
 
     gl_Position = uPMatrix * vPosition;
 }

@@ -42,6 +42,142 @@ var Camera = (function () {
 }());
 var gml;
 (function (gml) {
+    (function (Halfspace) {
+        Halfspace[Halfspace["POSITIVE"] = 0] = "POSITIVE";
+        Halfspace[Halfspace["NEGATIVE"] = 1] = "NEGATIVE";
+        Halfspace[Halfspace["COINCIDENT"] = 2] = "COINCIDENT";
+    })(gml.Halfspace || (gml.Halfspace = {}));
+    var Halfspace = gml.Halfspace;
+    var Collision = (function () {
+        function Collision() {
+        }
+        /**
+         * Given a point, classifies on which side of a plane it lies.
+         */
+        Collision.CategorizeHalfspace = function (point, plane) {
+            // we know that for the plane, N dot p0 + d = 0 where p0 is a point on the plane
+            // we know that the point p is on the positive side of the halfspace iff:
+            //      N dot (p - p0) > 0
+            //   => N dot p - N dot p0 > 0
+            //   => N dot p - (-d) > 0 (substituting N dot p0 = -d)
+            //   => N dot p > -d
+            var dp = plane.normal.dot(point);
+            if (Math.abs(dp + plane.d) < gml.EPSILON) {
+                return Halfspace.COINCIDENT;
+            }
+            else if (dp > -plane.d) {
+                return Halfspace.POSITIVE;
+            }
+            else {
+                return Halfspace.NEGATIVE;
+            }
+        };
+        /**
+         * Computes the point of intersection between a line segment and a plane if one exists.
+         *
+         * @returns true if there exists a single point intersection between the line segment and a plane
+         *          false if there exists no intersections or if the line segment lies on the plane
+         */
+        Collision.LineSegmentPlaneIntersection = function (seg_start, seg_end, pl, result) {
+            // let p1, p2 be seg_start, seg_end respectively.
+            // let p, n be some point on and the normal of the plane pl respectively, let d be the parameter d of the plane pl.
+            // let p' be the intersection point of the line defined by the line segment and the plane.
+            //
+            // we have   p'                         = p1 + t*(p2-p1)
+            // and       p dot n + d                = 0
+            // =>        (p1 + t*(p2-p1)) dot n + d = 0
+            //
+            // after some arithmetic, we arrive at:
+            //
+            // t = -(n dot p1 + d)/(n dot (p2-p1))
+            //
+            // if n dot (p2-p1) = 0, then the line is parallel with the plane (it lies on the plane if n dot p1 + d is also 0).
+            var r = seg_end.subtract(seg_start);
+            var denom = pl.normal.dot(r);
+            if (denom != 0) {
+                var t = -(pl.normal.dot(seg_start) + pl.d) / denom;
+                if (t > 0 && t <= 1) {
+                    gml.Vec4.multiply(r, t, result);
+                    gml.Vec4.add(seg_start, result, result);
+                    return true;
+                }
+            }
+            return false;
+        };
+        /**
+         * Computes the point of intersection between a ray and a plane if one exists.
+         *
+         * @returns true if there exists a single point intersection between the ray and a plane
+         *          false if there exists no intersections or if the ray lies on the plane
+         */
+        Collision.RayPlaneIntersection = function (ray, pl, result) {
+            // let o, v be the start and direction of ray.
+            // let p, n be some point on and the normal of the plane pl respectively, let d be the parameter d of the plane pl.
+            // let p' be the intersection point of the ray and the plane.
+            //
+            // we have   p'                  = o + t*v
+            // and       p dot n + d         = 0
+            // =>        (o + t*v) dot n + d = 0
+            //
+            // after some arithmetic, we arrive at:
+            //
+            // t = -(n dot o + d)/(n dot v)
+            //
+            // if n dot v = 0, then the ray is parallel with the plane (it lies on the plane if n dot o + d is also 0).
+            var denom = pl.normal.dot(ray.direction);
+            if (denom != 0) {
+                var t = -(pl.normal.dot(ray.point) + pl.d) / denom;
+                if (t > 0) {
+                    gml.Vec4.multiply(ray.direction, t, result);
+                    gml.Vec4.add(ray.point, result, result);
+                    return true;
+                }
+            }
+            return false;
+        };
+        /**
+         * Clips a polygon with a set of planes using the Sutherland-Hodgman algorithm.
+         *
+         * @returns A polygon that is the result of the subject polygon clipped
+         * by the clipper plane set
+         */
+        Collision.Clip = function (subject, clipper) {
+            var out_pts = [];
+            // assume the positive halfspace means inside
+            var inside = Halfspace.POSITIVE;
+            for (var i = 0; i < clipper.length; i++) {
+                var plane = clipper[i];
+                // iterate over points in polygon, checking two  points each time and categorizing them.
+                var s = subject.points[subject.points.length - 1];
+                var intersection = gml.Vec4.zero;
+                for (var j = 0; j < subject.points.length; j++) {
+                    var e = subject.points[j];
+                    var e_cat = Collision.CategorizeHalfspace(e, plane);
+                    var s_cat = Collision.CategorizeHalfspace(s, plane);
+                    if (e_cat == inside) {
+                        if (s_cat != inside) {
+                            if (Collision.LineSegmentPlaneIntersection(s, e, plane, intersection)) {
+                                out_pts.push(gml.Vec4.clone(intersection));
+                            }
+                        }
+                        out_pts.push(gml.Vec4.clone(e));
+                    }
+                    else if (s_cat == inside) {
+                        if (Collision.LineSegmentPlaneIntersection(s, e, plane, intersection)) {
+                            out_pts.push(gml.Vec4.clone(intersection));
+                        }
+                    }
+                    s = e; // advance vertex pointer ( look at the next edge in subject polygon)
+                }
+            }
+            return new gml.Polygon(out_pts);
+        };
+        return Collision;
+    }());
+    gml.Collision = Collision;
+})(gml || (gml = {}));
+var gml;
+(function (gml) {
     var Vector = (function () {
         function Vector(size) {
             var args = [];
@@ -156,9 +292,9 @@ var gml;
          */
         Vector.prototype.normalize = function () {
             var l = this.len;
-            this.v = this.v.map(function (v) {
-                return v / l;
-            });
+            for (var i = 0; i < this.size; i++) {
+                this.v[i] /= l;
+            }
         };
         Object.defineProperty(Vector.prototype, "normalized", {
             get: function () {
@@ -401,7 +537,9 @@ var gml;
         };
         Matrix.prototype.multiply = function (arg) {
             if (arg instanceof Matrix) {
-                return Matrix.matmul(this, arg);
+                var out = new Matrix(this.rows, arg.cols, new Float32Array(this.rows * arg.cols));
+                Matrix.matmul(this, arg, out);
+                return out;
             }
             else {
                 return this.scalarmul(arg);
@@ -414,22 +552,20 @@ var gml;
             }
             return new Matrix(this.rows, this.cols, vs);
         };
-        Matrix.matmul = function (lhs, rhs) {
+        Matrix.matmul = function (lhs, rhs, out) {
             if (lhs.rows != rhs.cols) {
                 console.warn("lhs and rhs incompatible for matrix multiplication!");
                 return null;
             }
-            var out = [];
             for (var i = 0; i < lhs.rows; i++) {
                 for (var j = 0; j < rhs.cols; j++) {
                     var sum = 0;
                     for (var k = 0; k < lhs.cols; k++) {
                         sum += lhs.get(i, k) * rhs.get(k, j);
                     }
-                    out[i * lhs.cols + j] = sum;
+                    out.v[i * lhs.cols + j] = sum;
                 }
             }
-            return new Matrix(lhs.rows, rhs.cols, out);
         };
         Matrix.identity = function (size) {
             var v = [];
@@ -984,7 +1120,17 @@ var gml;
         });
         Object.defineProperty(Mat4.prototype, "scale", {
             get: function () {
-                return new gml.Vec3(this.get(0, 0), this.get(1, 1), this.get(2, 2));
+                var m00 = this.v[0];
+                var m01 = this.v[1];
+                var m02 = this.v[2];
+                var m10 = this.v[4];
+                var m11 = this.v[5];
+                var m12 = this.v[6];
+                var m20 = this.v[8];
+                var m21 = this.v[9];
+                var m22 = this.v[10];
+                // scale is the length of each corresponding column vector
+                return new gml.Vec3(Math.sqrt(m00 * m00 + m10 * m10 + m20 * m20), Math.sqrt(m01 * m01 + m11 * m11 + m21 * m21), Math.sqrt(m02 * m02 + m12 * m12 + m22 * m22));
             },
             set: function (s) {
                 this.set(0, 0, s.x);
@@ -996,7 +1142,9 @@ var gml;
         });
         Mat4.prototype.multiply = function (arg) {
             if (arg instanceof Mat4) {
-                return Mat4.matmul(this, arg);
+                var out = Mat4.identity();
+                Mat4.matmul(this, arg, out);
+                return out;
             }
             else {
                 return this.scalarmul(arg);
@@ -1052,7 +1200,75 @@ var gml;
             if (det == 0)
                 return Mat4.identity(); // fail
             var f = 1 / det;
-            return new Mat4(f * (-m13 * m22 * m31 + m12 * m23 * m31 + m13 * m21 * m32 - m11 * m23 * m32 - m12 * m21 * m33 + m11 * m22 * m33), f * (m03 * m22 * m31 - m02 * m23 * m31 - m03 * m21 * m32 + m01 * m23 * m32 + m02 * m21 * m33 - m01 * m22 * m33), f * (-m03 * m12 * m31 + m02 * m13 * m31 + m03 * m11 * m32 - m01 * m13 * m32 - m02 * m11 * m33 + m01 * m12 * m33), f * (m03 * m12 * m21 - m02 * m13 * m21 - m03 * m11 * m22 + m01 * m13 * m22 + m02 * m11 * m23 - m01 * m12 * m23), f * (m13 * m22 * m30 - m12 * m23 * m30 - m13 * m20 * m32 + m10 * m23 * m32 + m12 * m20 * m33 - m10 * m22 * m33), f * (-m03 * m22 * m30 + m02 * m23 * m30 + m03 * m20 * m32 - m00 * m23 * m32 - m02 * m20 * m33 + m00 * m22 * m33), f * (m03 * m12 * m30 - m02 * m13 * m30 - m03 * m10 * m32 + m00 * m13 * m32 + m02 * m10 * m33 - m00 * m12 * m33), f * (-m03 * m12 * m20 + m02 * m13 * m20 + m03 * m10 * m22 - m00 * m13 * m22 - m02 * m10 * m23 + m00 * m12 * m23), f * (-m13 * m21 * m30 + m11 * m23 * m30 + m13 * m20 * m31 - m10 * m23 * m31 - m11 * m20 * m33 + m10 * m21 * m33), f * (m03 * m21 * m30 - m01 * m23 * m30 - m03 * m20 * m31 + m00 * m23 * m31 + m01 * m20 * m33 - m00 * m21 * m33), f * (-m03 * m11 * m30 + m01 * m13 * m30 + m03 * m10 * m31 - m00 * m13 * m31 - m01 * m10 * m33 + m00 * m11 * m33), f * (m03 * m11 * m20 - m01 * m13 * m20 - m03 * m10 * m21 + m00 * m13 * m21 + m01 * m10 * m23 - m00 * m11 * m23), f * (m12 * m21 * m30 - m11 * m22 * m30 - m12 * m20 * m31 + m10 * m22 * m31 + m11 * m20 * m32 - m10 * m21 * m32), f * (-m02 * m21 * m30 + m01 * m22 * m30 + m02 * m20 * m31 - m00 * m22 * m31 - m01 * m20 * m32 + m00 * m21 * m32), f * (m02 * m11 * m30 - m01 * m12 * m30 - m02 * m10 * m31 + m00 * m12 * m31 + m01 * m10 * m32 - m00 * m11 * m32), f * (-m02 * m11 * m20 + m01 * m12 * m20 + m02 * m10 * m21 - m00 * m12 * m21 - m01 * m10 * m22 + m00 * m11 * m22));
+            /* given the expanded form of the 4x4 inverse:
+             *
+             *    ( f * ( -m13 * m22 * m31 + m12 * m23 * m31 + m13 * m21 * m32 - m11 * m23 * m32 - m12 * m21 * m33 + m11 * m22 * m33 )
+             *    , f * (  m03 * m22 * m31 - m02 * m23 * m31 - m03 * m21 * m32 + m01 * m23 * m32 + m02 * m21 * m33 - m01 * m22 * m33 )
+             *    , f * ( -m03 * m12 * m31 + m02 * m13 * m31 + m03 * m11 * m32 - m01 * m13 * m32 - m02 * m11 * m33 + m01 * m12 * m33 )
+             *    , f * (  m03 * m12 * m21 - m02 * m13 * m21 - m03 * m11 * m22 + m01 * m13 * m22 + m02 * m11 * m23 - m01 * m12 * m23 )
+             *
+             *    , f * (  m13 * m22 * m30 - m12 * m23 * m30 - m13 * m20 * m32 + m10 * m23 * m32 + m12 * m20 * m33 - m10 * m22 * m33 )
+             *    , f * ( -m03 * m22 * m30 + m02 * m23 * m30 + m03 * m20 * m32 - m00 * m23 * m32 - m02 * m20 * m33 + m00 * m22 * m33 )
+             *    , f * (  m03 * m12 * m30 - m02 * m13 * m30 - m03 * m10 * m32 + m00 * m13 * m32 + m02 * m10 * m33 - m00 * m12 * m33 )
+             *    , f * ( -m03 * m12 * m20 + m02 * m13 * m20 + m03 * m10 * m22 - m00 * m13 * m22 - m02 * m10 * m23 + m00 * m12 * m23 )
+             *
+             *    , f * ( -m13 * m21 * m30 + m11 * m23 * m30 + m13 * m20 * m31 - m10 * m23 * m31 - m11 * m20 * m33 + m10 * m21 * m33 )
+             *    , f * (  m03 * m21 * m30 - m01 * m23 * m30 - m03 * m20 * m31 + m00 * m23 * m31 + m01 * m20 * m33 - m00 * m21 * m33 )
+             *    , f * ( -m03 * m11 * m30 + m01 * m13 * m30 + m03 * m10 * m31 - m00 * m13 * m31 - m01 * m10 * m33 + m00 * m11 * m33 )
+             *    , f * (  m03 * m11 * m20 - m01 * m13 * m20 - m03 * m10 * m21 + m00 * m13 * m21 + m01 * m10 * m23 - m00 * m11 * m23 )
+             *
+             *    , f * (  m12 * m21 * m30 - m11 * m22 * m30 - m12 * m20 * m31 + m10 * m22 * m31 + m11 * m20 * m32 - m10 * m21 * m32 )
+             *    , f * ( -m02 * m21 * m30 + m01 * m22 * m30 + m02 * m20 * m31 - m00 * m22 * m31 - m01 * m20 * m32 + m00 * m21 * m32 )
+             *    , f * (  m02 * m11 * m30 - m01 * m12 * m30 - m02 * m10 * m31 + m00 * m12 * m31 + m01 * m10 * m32 - m00 * m11 * m32 )
+             *    , f * ( -m02 * m11 * m20 + m01 * m12 * m20 + m02 * m10 * m21 - m00 * m12 * m21 - m01 * m10 * m22 + m00 * m11 * m22 ) )
+             *
+             * rearrange to match terms a00-a11 from determinant computation:
+             *
+             *    ( f * (  m13 * m21 * m32 - m13 * m22 * m31 - m12 * m21 * m33 + m12 * m23 * m31 + m11 * m22 * m33 - m11 * m23 * m32 )
+             *    , f * ( -m03 * m21 * m32 + m03 * m22 * m31 + m02 * m21 * m33 - m02 * m23 * m31 - m01 * m22 * m33 + m01 * m23 * m32 )
+             *    , f * ( -m31 * m03 * m12 + m31 * m02 * m13 + m32 * m03 * m11 - m32 * m01 * m13 - m33 * m02 * m11 + m33 * m01 * m12 )
+             *    , f * (  m21 * m03 * m12 - m21 * m02 * m13 - m22 * m03 * m11 + m22 * m01 * m13 + m23 * m02 * m11 - m23 * m01 * m12 )
+             *
+             *    , f * ( -m13 * m20 * m32 + m13 * m22 * m30 - m12 * m23 * m30 + m12 * m20 * m33 + m10 * m23 * m32 - m10 * m22 * m33 )
+             *    , f * (  m03 * m20 * m32 - m03 * m22 * m30 + m02 * m23 * m30 - m02 * m20 * m33 - m00 * m23 * m32 + m00 * m22 * m33 )
+             *    , f * (  m30 * m03 * m12 - m30 * m02 * m13 + m32 * m00 * m13 - m32 * m03 * m10 + m33 * m02 * m10 - m33 * m00 * m12 )
+             *    , f * ( -m20 * m03 * m12 + m20 * m02 * m13 - m22 * m00 * m13 + m22 * m03 * m10 - m23 * m02 * m10 + m23 * m00 * m12 )
+             *
+             *    , f * ( -m13 * m21 * m30 + m13 * m20 * m31 + m11 * m23 * m30 - m11 * m20 * m33 + m10 * m21 * m33 - m10 * m23 * m31 )
+             *    , f * (  m03 * m21 * m30 - m03 * m20 * m31 - m01 * m23 * m30 + m01 * m20 * m33 - m00 * m21 * m33 + m00 * m23 * m31 )
+             *    , f * ( -m30 * m03 * m11 + m30 * m01 * m13 - m31 * m00 * m13 + m31 * m03 * m10 + m33 * m00 * m11 - m33 * m01 * m10 )
+             *    , f * (  m20 * m03 * m11 - m20 * m01 * m13 + m21 * m00 * m13 - m21 * m03 * m10 - m23 * m00 * m11 + m23 * m01 * m10 )
+             *
+             *    , f * (  m12 * m21 * m30 - m12 * m20 * m31 + m11 * m20 * m32 - m11 * m22 * m30 - m10 * m21 * m32 + m10 * m22 * m31 )
+             *    , f * ( -m02 * m21 * m30 + m02 * m20 * m31 - m01 * m20 * m32 + m01 * m22 * m30 + m00 * m21 * m32 - m00 * m22 * m31 )
+             *    , f * (  m30 * m02 * m11 - m30 * m01 * m12 - m31 * m02 * m10 + m31 * m00 * m12 - m32 * m00 * m11 + m32 * m01 * m10 )
+             *    , f * ( -m20 * m02 * m11 + m20 * m01 * m12 + m21 * m02 * m10 - m21 * m00 * m12 + m22 * m00 * m11 - m22 * m01 * m10 ) );
+             *
+             * then factor:
+             *
+             *    ( f * (  m13 * ( m21 * m32 - m22 * m31 ) - m12 * ( m21 * m33 - m23 * m31 ) + m11 * ( m22 * m33 - m23 * m32 ) )
+             *    , f * ( -m03 * ( m21 * m32 - m22 * m31 ) + m02 * ( m21 * m33 - m23 * m31 ) - m01 * ( m22 * m33 - m23 * m32 ) )
+             *    , f * ( -m31 * ( m03 * m12 - m02 * m13 ) + m32 * ( m03 * m11 - m01 * m13 ) - m33 * ( m02 * m11 - m01 * m12 ) )
+             *    , f * (  m21 * ( m03 * m12 - m02 * m13 ) - m22 * ( m03 * m11 - m01 * m13 ) + m23 * ( m02 * m11 - m01 * m12 ) )
+             *
+             *    , f * ( -m13 * ( m20 * m32 - m22 * m30 ) - m12 * ( m23 * m30 - m20 * m33 ) + m10 * ( m23 * m32 - m22 * m33 ) )
+             *    , f * (  m03 * ( m20 * m32 - m22 * m30 ) + m02 * ( m23 * m30 - m20 * m33 ) - m00 * ( m23 * m32 - m22 * m33 ) )
+             *    , f * (  m30 * ( m03 * m12 - m02 * m13 ) + m32 * ( m00 * m13 - m03 * m10 ) + m33 * ( m02 * m10 - m00 * m12 ) )
+             *    , f * ( -m20 * ( m03 * m12 - m02 * m13 ) - m22 * ( m00 * m13 - m03 * m10 ) - m23 * ( m02 * m10 - m00 * m12 ) )
+             *
+             *    , f * ( -m13 * ( m21 * m30 - m20 * m31 ) + m11 * ( m23 * m30 - m20 * m33 ) + m10 * ( m21 * m33 - m23 * m31 ) )
+             *    , f * (  m03 * ( m21 * m30 - m20 * m31 ) - m01 * ( m23 * m30 - m20 * m33 ) - m00 * ( m21 * m33 - m23 * m31 ) )
+             *    , f * ( -m30 * ( m03 * m11 - m01 * m13 ) - m31 * ( m00 * m13 - m03 * m10 ) + m33 * ( m00 * m11 - m01 * m10 ) )
+             *    , f * (  m20 * ( m03 * m11 - m01 * m13 ) + m21 * ( m00 * m13 - m03 * m10 ) - m23 * ( m00 * m11 - m01 * m10 ) )
+             *
+             *    , f * (  m12 * ( m21 * m30 - m20 * m31 ) + m11 * ( m20 * m32 - m22 * m30 ) - m10 * ( m21 * m32 - m22 * m31 ) )
+             *    , f * ( -m02 * ( m21 * m30 - m20 * m31 ) - m01 * ( m20 * m32 - m22 * m30 ) + m00 * ( m21 * m32 - m22 * m31 ) )
+             *    , f * (  m30 * ( m02 * m11 - m01 * m12 ) - m31 * ( m02 * m10 - m00 * m12 ) - m32 * ( m00 * m11 - m01 * m10 ) )
+             *    , f * ( -m20 * ( m02 * m11 - m01 * m12 ) + m21 * ( m02 * m10 - m00 * m12 ) + m22 * ( m00 * m11 - m01 * m10 ) ) );
+             *
+             * and finally, substitute terms to arrive at the result:
+             */
+            return new Mat4(f * (m13 * a03 - m12 * a05 + m11 * a07), f * (-m03 * a03 + m02 * a05 - m01 * a07), f * (-m31 * a10 + m32 * a00 - m33 * a08), f * (m21 * a10 - m22 * a00 + m23 * a08), f * (-m13 * a01 - m12 * a09 - m10 * a07), f * (m03 * a01 + m02 * a09 + m00 * a07), f * (m30 * a10 + m32 * a02 + m33 * a04), f * (-m20 * a10 - m22 * a02 - m23 * a04), f * (-m13 * a11 + m11 * a09 + m10 * a05), f * (m03 * a11 - m01 * a09 - m00 * a05), f * (-m30 * a00 - m31 * a02 + m33 * a06), f * (m20 * a00 + m21 * a02 - m23 * a06), f * (m12 * a11 + m11 * a01 - m10 * a03), f * (-m02 * a11 - m01 * a01 + m00 * a03), f * (m30 * a08 - m31 * a04 - m32 * a06), f * (-m20 * a08 + m21 * a04 + m22 * a06));
         };
         Object.defineProperty(Mat4.prototype, "determinant", {
             /**
@@ -1194,7 +1410,7 @@ var gml;
         Mat4.fromCols = function (c1, c2, c3, c4) {
             return new Mat4(c1.x, c2.x, c3.x, c4.x, c1.y, c2.y, c3.y, c4.y, c1.z, c2.z, c3.z, c4.z, c1.w, c2.w, c3.w, c4.w);
         };
-        Mat4.matmul = function (lhs, rhs) {
+        Mat4.matmul = function (lhs, rhs, out) {
             var l00 = lhs.v[0];
             var l01 = lhs.v[1];
             var l02 = lhs.v[2];
@@ -1227,11 +1443,39 @@ var gml;
             var r31 = rhs.v[13];
             var r32 = rhs.v[14];
             var r33 = rhs.v[15];
-            return new Mat4(l00 * r00 + l01 * r10 + l02 * r20 + l03 * r30, l00 * r01 + l01 * r11 + l02 * r21 + l03 * r31, l00 * r02 + l01 * r12 + l02 * r22 + l03 * r32, l00 * r03 + l01 * r13 + l02 * r23 + l03 * r33, l10 * r00 + l11 * r10 + l12 * r20 + l13 * r30, l10 * r01 + l11 * r11 + l12 * r21 + l13 * r31, l10 * r02 + l11 * r12 + l12 * r22 + l13 * r32, l10 * r03 + l11 * r13 + l12 * r23 + l13 * r33, l20 * r00 + l21 * r10 + l22 * r20 + l23 * r30, l20 * r01 + l21 * r11 + l22 * r21 + l23 * r31, l20 * r02 + l21 * r12 + l22 * r22 + l23 * r32, l20 * r03 + l21 * r13 + l22 * r23 + l23 * r33, l30 * r00 + l31 * r10 + l32 * r20 + l33 * r30, l30 * r01 + l31 * r11 + l32 * r21 + l33 * r31, l30 * r02 + l31 * r12 + l32 * r22 + l33 * r32, l30 * r03 + l31 * r13 + l32 * r23 + l33 * r33);
+            out.r00 = l00 * r00 + l01 * r10 + l02 * r20 + l03 * r30;
+            out.r01 = l00 * r01 + l01 * r11 + l02 * r21 + l03 * r31;
+            out.r02 = l00 * r02 + l01 * r12 + l02 * r22 + l03 * r32;
+            out.tx = l00 * r03 + l01 * r13 + l02 * r23 + l03 * r33;
+            out.r10 = l10 * r00 + l11 * r10 + l12 * r20 + l13 * r30;
+            out.r11 = l10 * r01 + l11 * r11 + l12 * r21 + l13 * r31;
+            out.r12 = l10 * r02 + l11 * r12 + l12 * r22 + l13 * r32;
+            out.ty = l10 * r03 + l11 * r13 + l12 * r23 + l13 * r33;
+            out.r20 = l20 * r00 + l21 * r10 + l22 * r20 + l23 * r30;
+            out.r21 = l20 * r01 + l21 * r11 + l22 * r21 + l23 * r31;
+            out.r22 = l20 * r02 + l21 * r12 + l22 * r22 + l23 * r32;
+            out.tz = l20 * r03 + l21 * r13 + l22 * r23 + l23 * r33;
+            out.m30 = l30 * r00 + l31 * r10 + l32 * r20 + l33 * r30;
+            out.m31 = l30 * r01 + l31 * r11 + l32 * r21 + l33 * r31;
+            out.m32 = l30 * r02 + l31 * r12 + l32 * r22 + l33 * r32;
+            out.m33 = l30 * r03 + l31 * r13 + l32 * r23 + l33 * r33;
+        };
+        Mat4.transform = function (lhs, rhs, out) {
+            out.x = lhs.r00 * rhs.x + lhs.r01 * rhs.y + lhs.r02 * rhs.z + lhs.tx * rhs.w;
+            out.y = lhs.r10 * rhs.x + lhs.r11 * rhs.y + lhs.r12 * rhs.z + lhs.ty * rhs.w;
+            out.z = lhs.r20 * rhs.x + lhs.r21 * rhs.y + lhs.r22 * rhs.z + lhs.tz * rhs.w;
+            out.w = lhs.m30 * rhs.x + lhs.m31 * rhs.y + lhs.m32 * rhs.z + lhs.m33 * rhs.w;
         };
         return Mat4;
     }(gml.Matrix));
     gml.Mat4 = Mat4;
+    /**
+     * @returns a 4x4 matrix that transforms a point in a user-defined view frustum to a point in
+     *          a unit cube centered at the origin (IE: camera space to homogenous clip space).
+     *          The w-component of the output point is the negated z of the original point in camera
+     *          space. Division of the x, y, z-components of the mapped point by the w-component will
+     *          provide a point in normalized screen space (both x and y will range from -1 to 1).
+     */
     function makePerspective(fov, aspectRatio, near, far) {
         var t = near * Math.tan(fov.toRadians() / 2);
         var r = t * aspectRatio;
@@ -1239,10 +1483,31 @@ var gml;
         var b = -t;
         var n = near;
         var f = far;
-        return new Mat4((n * 2) / (r - l), 0, (r + l) / (r - l), 0, 0, (n * 2) / (t - b), (t + b) / (t - b), 0, 0, 0, -(f + n) / (f - n), -(f * n * 2) / (f - n), 0, 0, -1, 0);
+        return new Mat4(2 * n / (r - l), 0, (r + l) / (r - l), 0, 0, 2 * n / (t - b), (t + b) / (t - b), 0, 0, 0, -(f + n) / (f - n), -2 * n * f / (f - n), 0, 0, -1, 0);
     }
     gml.makePerspective = makePerspective;
-    // aim, up, and right are all vectors that are assumed to be orthogonal
+    /**
+     * @returns a 4x4 matrix to transform a point in a user-defined cube in view space to a point
+     *          in the unit cube centered at the origin (IE: camera space to homogenous clip space).
+     *          Useful for projecting UI objects that exist in 3D space.
+     */
+    function makeOrthographic(fov, aspectRatio, near, far) {
+        var t = near * Math.tan(fov.toRadians() / 2);
+        var r = t * aspectRatio;
+        var l = -r;
+        var b = -t;
+        var n = near;
+        var f = far;
+        return new Mat4(2 / (r - l), 0, 0, -(r + l) / (r - l), 0, 2 / (t - b), 0, -(t + b) / (t - b), 0, 0, -2 / (f - n), -(f + n) / (f - n), 0, 0, 0, 1);
+    }
+    gml.makeOrthographic = makeOrthographic;
+    /**
+     * @returns a 4x4 matrix to transform a point in world space to a point in camera
+     *          space.
+     *
+     * Aim, up, and right are all vectors that are assumed to be orthogonal. Normalization
+     * is performed in this method so they need not be already normalized.
+     */
     function makeLookAt(pos, aim, up, right) {
         var x = right.normalized;
         var y = up.normalized;
@@ -1255,6 +1520,41 @@ var gml;
         return lookAt;
     }
     gml.makeLookAt = makeLookAt;
+})(gml || (gml = {}));
+var gml;
+(function (gml) {
+    var Ray = (function () {
+        function Ray(p, d) {
+            this.point = p;
+            this.direction = d;
+        }
+        Ray.At = function (r, t) {
+            var out;
+            gml.Vec4.multiply(r.direction, t, out);
+            gml.Vec4.add(r.point, out, out);
+            return out;
+        };
+        return Ray;
+    }());
+    gml.Ray = Ray;
+    var Polygon = (function () {
+        function Polygon(points) {
+            this.points = points;
+        }
+        return Polygon;
+    }());
+    gml.Polygon = Polygon;
+    var Plane = (function () {
+        function Plane(normal, d) {
+            this.normal = normal;
+            this.d = d;
+        }
+        Plane.fromCoefficients = function (coeffs) {
+            return new Plane(new gml.Vec4(coeffs.x, coeffs.y, coeffs.z, 1), coeffs.w);
+        };
+        return Plane;
+    }());
+    gml.Plane = Plane;
 })(gml || (gml = {}));
 ///<reference path="../vec.ts"/>
 var gml;
@@ -1885,6 +2185,116 @@ var gml;
 })(gml || (gml = {}));
 var gml;
 (function (gml) {
+    var Color = (function (_super) {
+        __extends(Color, _super);
+        function Color() {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i - 0] = arguments[_i];
+            }
+            _super.call(this, 4);
+            if (args.length == 4) {
+                this.v[0] = args[0];
+                this.v[1] = args[1];
+                this.v[2] = args[2];
+                this.v[3] = args[3];
+            }
+            else if (args.length == 1) {
+                var arr = args[0];
+                this.v[0] = arr[0];
+                this.v[1] = arr[1];
+                this.v[2] = arr[2];
+                this.v[3] = arr[3];
+            }
+        }
+        Object.defineProperty(Color.prototype, "r", {
+            get: function () {
+                return this.v[0];
+            },
+            set: function (r) {
+                this.v[0] = r;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "g", {
+            get: function () {
+                return this.v[1];
+            },
+            set: function (g) {
+                this.v[1] = g;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "b", {
+            get: function () {
+                return this.v[2];
+            },
+            set: function (b) {
+                this.v[2] = b;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color.prototype, "a", {
+            get: function () {
+                return this.v[3];
+            },
+            set: function (a) {
+                this.v[3] = a;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Color.degamma = function (in_color, out_color) {
+            var to_linear = 1.0 / 2.2;
+            out_color.r = Math.pow(in_color.r, to_linear);
+            out_color.g = Math.pow(in_color.g, to_linear);
+            out_color.b = Math.pow(in_color.b, to_linear);
+            out_color.a = in_color.a;
+        };
+        Color.engamma = function (in_color, out_color) {
+            var to_srgb = 2.2;
+            out_color.r = Math.pow(in_color.r, to_srgb);
+            out_color.g = Math.pow(in_color.g, to_srgb);
+            out_color.b = Math.pow(in_color.b, to_srgb);
+            out_color.a = in_color.a;
+        };
+        Object.defineProperty(Color, "white", {
+            get: function () {
+                return new Color(1, 1, 1, 1);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color, "black", {
+            get: function () {
+                return new Color(0, 0, 0, 1);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(Color, "transparent_black", {
+            get: function () {
+                return new Color(0, 0, 0, 0);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return Color;
+    }(gml.Vector));
+    gml.Color = Color;
+})(gml || (gml = {}));
+var gml;
+(function (gml) {
+    /***
+     * Any floating-point value smaller than EPSILON is considered to be zero in this library.
+     */
+    gml.EPSILON = 1e-6;
+})(gml || (gml = {}));
+var gml;
+(function (gml) {
     /**
      * Implements common easing methods (generally used) for tweening.
      * The easing formulas used here are based on the work by
@@ -1900,6 +2310,8 @@ var gml;
             return t * t;
         };
         Easing.QuadOut = function (t) {
+            // note that this works out to be the same as
+            // 1-(x-1)(x-1)
             return -t * (t - 2);
         };
         Easing.QuadInOut = function (t) {
@@ -1959,6 +2371,70 @@ var gml;
                 return (_t * _t * _t + 1) / 2 + 0.5;
             }
         };
+        Easing.QuarticIn = function (t) {
+            return t * t * t * t;
+        };
+        Easing.QuarticOut = function (t) {
+            var _t = t - 1;
+            return 1 - _t * _t * _t * _t;
+        };
+        Easing.QuarticInOut = function (t) {
+            if (t < 0.5) {
+                /* we want verbatim behavior as QuarticIn, except we're passing in t
+                 * with a range of 0 to 0.5, and we want the output to also range from
+                 * 0 to 0.5.
+                 *
+                 * we double the input parameter s.t. it is 0 to 1, then pass it into
+                 * the QuarticIn function (t*t*t*t), then half the result to get an output
+                 * from 0 to 0.5. IE: 0.5*2t*2t*2t*2t. Resolves to 8*t*t*t*t
+                 */
+                return 8 * t * t * t * t;
+            }
+            else {
+                /* we want verbatim behavior as QuarticOut, except we're passing in t
+                 * with a range of 0.5 to 1, and we want the output to also range from
+                 * 0.5 to 1.
+                 *
+                 * we transform the input parameter s.t. it is 0 to 1, then pass it into
+                 * the QuarticOut function (t-1)^3 + 1, then transform the result s.t. it is
+                 * from 0.5 to 1.
+                 */
+                var _t = ((t - 0.5) * 2) - 1;
+                return (-_t * _t * _t * _t + 1) / 2 + 0.5;
+            }
+        };
+        Easing.QuintIn = function (t) {
+            return t * t * t * t * t;
+        };
+        Easing.QuintOut = function (t) {
+            var _t = t - 1;
+            return _t * _t * _t * _t * _t + 1;
+        };
+        Easing.QuintInOut = function (t) {
+            if (t < 0.5) {
+                /* we want verbatim behavior as QuintIn, except we're passing in t
+                 * with a range of 0 to 0.5, and we want the output to also range from
+                 * 0 to 0.5.
+                 *
+                 * we double the input parameter s.t. it is 0 to 1, then pass it into
+                 * the QuintIn function (t*t*t*t*t), then half the result to get an output
+                 * from 0 to 0.5. IE: 0.5*2t*2t*2t*2t*2t. Resolves to 16*t*t*t*t*t
+                 */
+                return 16 * t * t * t * t * t;
+            }
+            else {
+                /* we want verbatim behavior as QuintOut, except we're passing in t
+                 * with a range of 0.5 to 1, and we want the output to also range from
+                 * 0.5 to 1.
+                 *
+                 * we transform the input parameter s.t. it is 0 to 1, then pass it into
+                 * the QuarticOut function (t-1)^5 + 1, then transform the result s.t. it is
+                 * from 0.5 to 1.
+                 */
+                var _t = ((t - 0.5) * 2) - 1;
+                return (_t * _t * _t * _t * _t + 1) / 2 + 0.5;
+            }
+        };
         Easing.TrigIn = function (t) {
             return 1 - Math.cos(t * (Math.PI / 2));
         };
@@ -2015,6 +2491,70 @@ var gml;
                 var _t = ((t - 0.5) * 2) - 1;
                 return (_t * _t * ((s + 1) * _t + s) + 1) / 2 + 0.5;
             }
+        };
+        Easing.ElasticIn = function (t) {
+            // elastic easing is essentially a transformation of the dampened sine wave
+            // the elastic-ease-in curve looks like the reverse of a dampened sine wave
+            if (t == 0)
+                return 0;
+            if (t == 1)
+                return 1;
+            var p = 0.3;
+            var s = p / 4;
+            var _t = t - 1;
+            return -Math.pow(2, 10 * _t) * Math.sin((_t - s) * 2 * Math.PI / p);
+        };
+        Easing.ElasticOut = function (t) {
+            // the elastic-ease-in curve looks like the standard version of a dampened sine wave
+            if (t == 0)
+                return 0;
+            if (t == 1)
+                return 1;
+            var p = 0.3;
+            var s = p / 4;
+            return Math.pow(2, -10 * t) * Math.sin((t - s) * 2 * Math.PI / p) + 1;
+        };
+        Easing.ElasticInOut = function (t) {
+            if (t == 0)
+                return 0;
+            if (t == 1)
+                return 1;
+            var p = 0.45;
+            var s = p / 4;
+            if (t < 0.5) {
+                var _t = 2 * t;
+                return -0.5 * Math.pow(2, 10 * (_t - 1)) * Math.sin(((_t - 1) - s) * 2 * Math.PI / p);
+            }
+            else {
+                var _t = 2 * t - 1;
+                return 0.5 * Math.pow(2, -10 * _t) * Math.sin((_t - s) * 2 * Math.PI / p) + 1;
+            }
+        };
+        Easing.BounceIn = function (t) {
+            return 1 - Easing.BounceOut(1 - t);
+        };
+        Easing.BounceOut = function (t) {
+            if (t < (1 / 2.75)) {
+                return 7.5625 * t * t;
+            }
+            else if (t < (2 / 2.75)) {
+                var _t = t - 1.5 / 2.75;
+                return 7.5625 * _t * _t + 0.75;
+            }
+            else if (t < (2.5 / 2.75)) {
+                var _t = t - 2.25 / 2.75;
+                return 7.5625 * _t * _t + .9375;
+            }
+            else {
+                var _t = t - 2.625 / 2.75;
+                return 7.5625 * _t * _t + .984375;
+            }
+        };
+        Easing.BounceInOut = function (t) {
+            if (t < 0.5)
+                return 0.5 * Easing.BounceIn(2 * t);
+            else
+                return 0.5 + 0.5 * Easing.BounceOut(2 * t - 1);
         };
         return Easing;
     }());
@@ -2172,7 +2712,7 @@ var RenderData = (function () {
         this.vertices = new Float32Array(0);
         this.normals = new Float32Array(0);
         this.colors = new Float32Array(0);
-        this.indices = new Uint16Array(0);
+        this.indices = new Uint32Array(0);
         this.isTextureMapped = false;
     }
     return RenderData;
@@ -2421,7 +2961,620 @@ var Cube = (function (_super) {
     return Cube;
 }(Primitive));
 ///<reference path='prim.ts' />
-// TODO make me a plane with UV subdivision count
+// like a regular plane but with a large shell around the center subdivided plane
+var InfinitePlane = (function (_super) {
+    __extends(InfinitePlane, _super);
+    function InfinitePlane(size, position, rotation, subdivisions, mat) {
+        if (size === void 0) { size = 1; }
+        if (position === void 0) { position = gml.Vec4.origin; }
+        if (rotation === void 0) { rotation = null; }
+        if (subdivisions === void 0) { subdivisions = { u: 0, v: 0 }; }
+        if (mat === void 0) { mat = new BlinnPhongMaterial(); }
+        _super.call(this);
+        this.subdivs = subdivisions;
+        this.transform = gml.Mat4.identity();
+        this.planesize = 10000; // Not quite infinite :) but very large.
+        var shells = 1; // Each tile is 64x64 verts. Each shell after the center is 2x the size of the previous shell
+        if (rotation != null) {
+            var m = gml.Mat4.identity();
+            var sx = Math.sin(rotation.x.toRadians());
+            var cx = Math.cos(rotation.x.toRadians());
+            var sy = Math.sin(rotation.y.toRadians());
+            var cy = Math.cos(rotation.y.toRadians());
+            var sz = Math.sin(rotation.z.toRadians());
+            var cz = Math.cos(rotation.z.toRadians());
+            m.r00 = cz * cy;
+            m.r01 = sz * cy;
+            m.r02 = -sy;
+            m.r10 = cz * sy * sx - sz * cx;
+            m.r11 = sz * sy * sx + cz * cx;
+            m.r12 = cy * sx;
+            m.r20 = cz * sy * cx + sz * sx;
+            m.r21 = sz * sy * cx - cz * sx;
+            m.r22 = cy * cx;
+            m.m33 = 1;
+            m.m30 = 0;
+            m.m31 = 0;
+            m.m32 = 0;
+            m.tx = 0;
+            m.ty = 0;
+            m.tz = 0;
+            this.transform = m.multiply(this.transform);
+        }
+        {
+            var m = gml.Mat4.identity();
+            m.scale = new gml.Vec3(size, size, size);
+            this.transform = m.multiply(this.transform);
+        }
+        this.transform.translation = position;
+        this.renderData = new RenderData();
+        this.material = mat;
+        // trigger a rebuild when the renderer updates
+        this.renderData.dirty = true;
+    }
+    // this should only be called by the renderer module
+    InfinitePlane.prototype.rebuildRenderData = function () {
+        if (this.renderData.dirty) {
+            this.renderData.dirty = false;
+            var vertices = [];
+            var uvs = [];
+            var planeVertexIndices = [];
+            {
+                // By default 4-vertex plane (no subdivisions) is in XY plane with z = 0
+                // Create values for each axis in its own array for easier subdivision implementation
+                var xs = [-1, 1]; // left to right
+                var ys = [1, -1]; // top to bottom
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // perform X subdivision (subdivisions along x-axis)
+                for (var iter = 0; iter < this.subdivs.u; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < xs.length - 1; i++) {
+                        subdivided.push(xs[i]);
+                        subdivided.push((xs[i] + xs[i + 1]) / 2);
+                    }
+                    subdivided.push(xs[xs.length - 1]);
+                    xs = subdivided;
+                    var subdivided_us = [];
+                    for (var i = 0; i < us.length - 1; i++) {
+                        subdivided_us.push(us[i]);
+                        subdivided_us.push((us[i] + us[i + 1]) / 2);
+                    }
+                    subdivided_us.push(us[us.length - 1]);
+                    us = subdivided_us;
+                }
+                // perform Y subdivision (subdivisions along x-axis)
+                for (var iter = 0; iter < this.subdivs.v; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(i * us.length + j); // top left
+                        planeVertexIndices.push(i * us.length + j + 1); // top right
+                        planeVertexIndices.push((i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(i * us.length * 1 + j); // top left
+                        planeVertexIndices.push((i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push((i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // now push shells (8 shells in total)
+            // top left
+            {
+                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
+                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // top mid
+            {
+                var xs = [-1, 1]; // left to right
+                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // top right
+            {
+                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
+                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // bottom left
+            {
+                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
+                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // bot mid
+            {
+                var xs = [-1, 1]; // left to right
+                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // bot right
+            {
+                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
+                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // mid left
+            {
+                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
+                var ys = [1, -1]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            // mid right
+            {
+                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
+                var ys = [1, -1]; // top to bottom
+                // uvs are incorrect but whatever
+                var us = [0, 1]; // left to right
+                var vs = [0, 1]; // top to bottom
+                // 64 vertices per shell, subdivide 6 times
+                for (var iter = 0; iter < 6; iter++) {
+                    var subdivided = [];
+                    for (var i = 0; i < ys.length - 1; i++) {
+                        subdivided.push(ys[i]);
+                        subdivided.push((ys[i] + ys[i + 1]) / 2);
+                    }
+                    subdivided.push(ys[ys.length - 1]);
+                    ys = subdivided;
+                    var subdivided_vs = [];
+                    for (var i = 0; i < vs.length - 1; i++) {
+                        subdivided_vs.push(vs[i]);
+                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
+                    }
+                    subdivided_vs.push(vs[vs.length - 1]);
+                    vs = subdivided_vs;
+                }
+                // combine xys into vertex position array
+                // going left to right, top to bottom (row major flat array)
+                var offset = vertices.length / 3;
+                for (var i = 0; i < ys.length; i++) {
+                    for (var j = 0; j < xs.length; j++) {
+                        vertices.push(xs[j]);
+                        vertices.push(0);
+                        vertices.push(ys[i]);
+                    }
+                }
+                for (var i = 0; i < vs.length; i++) {
+                    for (var j = 0; j < us.length; j++) {
+                        uvs.push(us[j]);
+                        uvs.push(vs[i]);
+                    }
+                }
+                // push two triangles (1 quad) each iteration
+                for (var i = 0; i < vs.length - 1; i++) {
+                    for (var j = 0; j < us.length - 1; j++) {
+                        // *-*
+                        //  \|
+                        //   *
+                        planeVertexIndices.push(offset + i * us.length + j); // top left
+                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        // *
+                        // |\
+                        // *-*
+                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
+                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
+                    }
+                }
+            }
+            this.renderData.vertices = new Float32Array(vertices);
+            this.renderData.textureCoords = new Float32Array(uvs);
+            var vertexNormals = [];
+            // flat plane; normals are all the same
+            for (var i = 0; i < vertices.length / 3; i++) {
+                vertexNormals.push(0.0);
+                vertexNormals.push(1.0);
+                vertexNormals.push(0.0);
+            }
+            this.renderData.normals = new Float32Array(vertexNormals);
+            console.log(planeVertexIndices);
+            this.renderData.indices = new Uint32Array(planeVertexIndices);
+        }
+    };
+    return InfinitePlane;
+}(Primitive));
+///<reference path='prim.ts' />
 var Plane = (function (_super) {
     __extends(Plane, _super);
     function Plane(size, position, rotation, subdivisions, mat) {
@@ -2524,10 +3677,6 @@ var Plane = (function (_super) {
                     vertices.push(ys[i]);
                 }
             }
-            console.log("xs");
-            console.log(xs);
-            console.log("ys");
-            console.log(ys);
             this.renderData.vertices = new Float32Array(vertices);
             var uvs = [];
             for (var i = 0; i < vs.length; i++) {
@@ -2564,7 +3713,7 @@ var Plane = (function (_super) {
                 }
             }
             console.log(planeVertexIndices);
-            this.renderData.indices = new Uint16Array(planeVertexIndices);
+            this.renderData.indices = new Uint32Array(planeVertexIndices);
         }
     };
     return Plane;
@@ -2698,7 +3847,7 @@ var Sphere = (function (_super) {
             }
             this.renderData.vertices = new Float32Array(vertices);
             this.renderData.normals = new Float32Array(vertices); // for a unit sphere located at 0,0,0, the normals are exactly the same as the vertices
-            this.renderData.indices = new Uint16Array(indices);
+            this.renderData.indices = new Uint32Array(indices);
             this.renderData.dirty = false;
         }
     };
@@ -2875,6 +4024,7 @@ var Renderer = (function () {
             success = false;
         }
         this.shaderLODExtension = gl.getExtension("EXT_shader_texture_lod");
+        this.elementIndexExtension = gl.getExtension("OES_element_index_uint");
         this.programData = [];
         // compile phong program
         var phongProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.BLINN_PHONG_FRAGMENT].source);
@@ -3099,7 +4249,7 @@ var Renderer = (function () {
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
         var _this = this;
-        var perspective = gml.makePerspective(gml.fromDegrees(45), 640.0 / 480.0, 0.1, 100.0);
+        var perspective = gml.makePerspective(gml.fromDegrees(45), 640.0 / 480.0, 0.1, 1000.0);
         scene.renderables.forEach(function (p, i) {
             if (p.material instanceof BlinnPhongMaterial) {
                 _this.useProgram(gl, SHADER_PROGRAM.BLINN_PHONG);
@@ -3171,7 +4321,10 @@ var Renderer = (function () {
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, p.renderData.indices, gl.STATIC_DRAW);
             gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexNormalBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, p.renderData.normals, gl.STATIC_DRAW);
-            gl.vertexAttribPointer(shaderVariables.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
+            if (shaderVariables.aVertexNormal != -1) {
+                // look into why this is -1!!!!!!!!
+                gl.vertexAttribPointer(shaderVariables.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
+            }
             if (scene.environmentMap != null) {
                 gl.uniform1i(shaderVariables.uEnvMap, 0); // tells shader to refer to texture slot 1 for the uEnvMap uniform
                 gl.activeTexture(gl.TEXTURE0);
@@ -3182,7 +4335,7 @@ var Renderer = (function () {
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.irradianceMap.cubeMapTexture);
             }
-            gl.drawElements(gl.TRIANGLES, p.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
+            gl.drawElements(gl.TRIANGLES, p.renderData.indices.length, gl.UNSIGNED_INT, 0);
         });
     };
     Renderer.prototype.useProgram = function (gl, program) {
@@ -3612,14 +4765,14 @@ function StartSky() {
     if (app == null) {
         var params = {
             vp: document.getElementById("big-viewport"),
-            orbitCenter: new gml.Vec4(0, 40, 0, 1),
-            orbitDistance: 10
+            orbitCenter: new gml.Vec4(0, 50, 0, 1),
+            orbitDistance: 30
         };
         shaderRepo = new ShaderRepository(function (repo) { app = new SkyApp(params, repo); });
         skyScene = new Scene(null, null);
         Scene.setActiveScene(skyScene);
         // ocean
-        skyScene.addRenderable(new Plane(100, new gml.Vec4(0, 30, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+        skyScene.addRenderable(new InfinitePlane(500, new gml.Vec4(0, 30, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 8, v: 8 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
     }
 }
 //# sourceMappingURL=app.js.map
