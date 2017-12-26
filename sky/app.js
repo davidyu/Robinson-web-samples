@@ -1597,8 +1597,17 @@ var gml;
             enumerable: true,
             configurable: true
         });
-        Vec2.prototype.add = function (rhs) {
-            return new Vec2(this.x + rhs.x, this.y + rhs.y);
+        Vec2.prototype.add = function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i - 0] = arguments[_i];
+            }
+            if (args.length == 2) {
+                return new Vec2(this.x + args[0], this.y + args[1]);
+            }
+            else {
+                return new Vec2(this.x + args[0].x, this.y + args[0].y);
+            }
         };
         Vec2.prototype.subtract = function (rhs) {
             return new Vec2(this.x - rhs.x, this.y - rhs.y);
@@ -1756,8 +1765,17 @@ var gml;
             enumerable: true,
             configurable: true
         });
-        Vec3.prototype.add = function (rhs) {
-            return new Vec3(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z);
+        Vec3.prototype.add = function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i - 0] = arguments[_i];
+            }
+            if (args.length == 3) {
+                return new Vec3(this.x + args[0], this.y + args[1], this.z + args[2]);
+            }
+            else {
+                return new Vec3(this.x + args[0].x, this.y + args[0].y, this.z + args[0].z);
+            }
         };
         Vec3.prototype.subtract = function (rhs) {
             return new Vec3(this.x - rhs.x, this.y - rhs.y, this.z - rhs.z);
@@ -1952,8 +1970,17 @@ var gml;
             enumerable: true,
             configurable: true
         });
-        Vec4.prototype.add = function (rhs) {
-            return new Vec4(this.x + rhs.x, this.y + rhs.y, this.z + rhs.z, this.w + rhs.w);
+        Vec4.prototype.add = function () {
+            var args = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                args[_i - 0] = arguments[_i];
+            }
+            if (args.length == 4) {
+                return new Vec4(this.x + args[0], this.y + args[1], this.z + args[2], this.w + args[3]);
+            }
+            else {
+                return new Vec4(this.x + args[0].x, this.y + args[0].y, this.z + args[0].z, this.w + args[0].w);
+            }
         };
         Vec4.prototype.subtract = function (rhs) {
             return new Vec4(this.x - rhs.x, this.y - rhs.y, this.z - rhs.z, this.w - rhs.w);
@@ -2183,6 +2210,7 @@ var gml;
         return Radian;
     }());
 })(gml || (gml = {}));
+///<reference path="vec.ts"/>
 var gml;
 (function (gml) {
     var Color = (function (_super) {
@@ -2966,8 +2994,9 @@ var Cube = (function (_super) {
 // like a regular plane but with a large shell around the center subdivided plane
 var InfinitePlane = (function (_super) {
     __extends(InfinitePlane, _super);
-    function InfinitePlane(size, position, rotation, subdivisions, mat) {
+    function InfinitePlane(size, layers, position, rotation, subdivisions, mat) {
         if (size === void 0) { size = 1; }
+        if (layers === void 0) { layers = 3; }
         if (position === void 0) { position = gml.Vec4.origin; }
         if (rotation === void 0) { rotation = null; }
         if (subdivisions === void 0) { subdivisions = { u: 0, v: 0 }; }
@@ -2976,7 +3005,7 @@ var InfinitePlane = (function (_super) {
         this.subdivs = subdivisions;
         this.transform = gml.Mat4.identity();
         this.planesize = 10000; // Not quite infinite :) but very large.
-        var shells = 1; // Each tile is 64x64 verts. Each shell after the center is 2x the size of the previous shell
+        this.layers = layers;
         if (rotation != null) {
             var m = gml.Mat4.identity();
             var sx = Math.sin(rotation.x.toRadians());
@@ -3014,6 +3043,55 @@ var InfinitePlane = (function (_super) {
         // trigger a rebuild when the renderer updates
         this.renderData.dirty = true;
     }
+    InfinitePlane.prototype.subdivide = function (min, max, times) {
+        var subdivided = [min, max];
+        for (var iter = 0; iter < times; iter++) {
+            var intermediate = [];
+            for (var i = 0; i < subdivided.length - 1; i++) {
+                intermediate.push(subdivided[i]);
+                intermediate.push((subdivided[i] + subdivided[i + 1]) / 2);
+            }
+            intermediate.push(subdivided[subdivided.length - 1]);
+            subdivided = intermediate;
+        }
+        return subdivided;
+    };
+    InfinitePlane.prototype.pushVertices = function (xs, ys, vertices) {
+        for (var i = 0; i < ys.length; i++) {
+            for (var j = 0; j < xs.length; j++) {
+                vertices.push(xs[j]);
+                vertices.push(0);
+                vertices.push(ys[i]);
+            }
+        }
+    };
+    InfinitePlane.prototype.pushUVs = function (us, vs, uvs) {
+        for (var i = 0; i < vs.length; i++) {
+            for (var j = 0; j < us.length; j++) {
+                uvs.push(us[j]);
+                uvs.push(vs[i]);
+            }
+        }
+    };
+    // pushes indices for a subdivided quad
+    InfinitePlane.prototype.pushIndices = function (offset, cols, rows, planeVertexIndices) {
+        for (var i = 0; i < rows - 1; i++) {
+            for (var j = 0; j < cols - 1; j++) {
+                // *-*
+                //  \|
+                //   *
+                planeVertexIndices.push(offset + i * cols + j); // top left
+                planeVertexIndices.push(offset + i * cols + j + 1); // top right
+                planeVertexIndices.push(offset + (i + 1) * cols + j + 1); // bottom right
+                // *
+                // |\
+                // *-*
+                planeVertexIndices.push(offset + i * cols * 1 + j); // top left
+                planeVertexIndices.push(offset + (i + 1) * cols + j + 1); // bottom right
+                planeVertexIndices.push(offset + (i + 1) * cols + j); // bottom left
+            }
+        }
+    };
     // this should only be called by the renderer module
     InfinitePlane.prototype.rebuildRenderData = function () {
         if (this.renderData.dirty) {
@@ -3021,544 +3099,171 @@ var InfinitePlane = (function (_super) {
             var vertices = [];
             var uvs = [];
             var planeVertexIndices = [];
+            var centerSize = 2;
+            // center quad
             {
-                // By default 4-vertex plane (no subdivisions) is in XY plane with z = 0
-                // Create values for each axis in its own array for easier subdivision implementation
-                var xs = [-1, 1]; // left to right
-                var ys = [1, -1]; // top to bottom
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // perform X subdivision (subdivisions along x-axis)
-                for (var iter = 0; iter < this.subdivs.u; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < xs.length - 1; i++) {
-                        subdivided.push(xs[i]);
-                        subdivided.push((xs[i] + xs[i + 1]) / 2);
-                    }
-                    subdivided.push(xs[xs.length - 1]);
-                    xs = subdivided;
-                    var subdivided_us = [];
-                    for (var i = 0; i < us.length - 1; i++) {
-                        subdivided_us.push(us[i]);
-                        subdivided_us.push((us[i] + us[i + 1]) / 2);
-                    }
-                    subdivided_us.push(us[us.length - 1]);
-                    us = subdivided_us;
-                }
-                // perform Y subdivision (subdivisions along x-axis)
-                for (var iter = 0; iter < this.subdivs.v; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(i * us.length + j); // top left
-                        planeVertexIndices.push(i * us.length + j + 1); // top right
-                        planeVertexIndices.push((i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(i * us.length * 1 + j); // top left
-                        planeVertexIndices.push((i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push((i + 1) * us.length + j); // bottom left
-                    }
-                }
+                var xs = this.subdivide(-centerSize / 2, centerSize / 2, this.subdivs.u);
+                var ys = this.subdivide(centerSize / 2, -centerSize / 2, this.subdivs.v);
+                var us = this.subdivide(0, 1, this.subdivs.u);
+                var vs = this.subdivide(0, 1, this.subdivs.v);
+                this.pushVertices(xs, ys, vertices);
+                this.pushUVs(us, vs, uvs);
+                this.pushIndices(0, xs.length, ys.length, planeVertexIndices);
             }
-            // now push shells (8 shells in total)
-            // top left
-            {
-                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
-                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
+            var inner_tl = new gml.Vec2(-1, 1);
+            var inner_br = new gml.Vec2(1, -1);
+            // shells
+            //
+            // reference layout:
+            // +---+---+---+---+
+            // | 0 | 1 | 2 | 3 |
+            // +---+-------+---+
+            // | 11|       | 4 |
+            // +---|       |---+
+            // | 10|       | 5 |
+            // +---+-------+---+
+            // | 9 | 8 | 7 | 6 |
+            // +---+---+---+---+
+            var lastSize = centerSize;
+            for (var layer = 0; layer < this.layers; layer++) {
+                var size = lastSize / 2;
+                var outer_tl = inner_tl.add(-size, size);
+                var outer_br = inner_br.add(size, -size);
+                // shell 0
+                {
+                    var xs = this.subdivide(outer_tl.x, inner_tl.x, 5);
+                    var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
+                // shell 1
+                {
+                    var xs = this.subdivide(inner_tl.x, inner_tl.x + size, 5);
+                    var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
+                // shell 2
+                {
+                    var xs = this.subdivide(inner_tl.x + size, inner_tl.x + 2 * size, 5);
+                    var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
+                // shell 3
+                {
+                    var xs = this.subdivide(inner_tl.x + 2 * size, outer_br.x, 5);
+                    var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-            }
-            // top mid
-            {
-                var xs = [-1, 1]; // left to right
-                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
+                // shell 4
+                {
+                    var xs = this.subdivide(outer_br.x - size, outer_br.x, 5);
+                    var ys = this.subdivide(inner_tl.y, inner_tl.y - size, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
+                // shell 5
+                {
+                    var xs = this.subdivide(outer_br.x - size, outer_br.x, 5);
+                    var ys = this.subdivide(inner_tl.y - size, inner_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
+                // shell 5
+                {
+                    var xs = this.subdivide(outer_br.x - size, outer_br.x, 5);
+                    var ys = this.subdivide(inner_br.y, outer_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
+                // shell 7
+                {
+                    var xs = this.subdivide(inner_tl.x + size, inner_tl.x + 2 * size, 5);
+                    var ys = this.subdivide(inner_br.y, outer_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-            }
-            // top right
-            {
-                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
-                var ys = [this.planesize / this.transform.scale.y, 1]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
+                // shell 8
+                {
+                    var xs = this.subdivide(inner_tl.x, inner_tl.x + size, 5);
+                    var ys = this.subdivide(inner_br.y, outer_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
+                // shell 9
+                {
+                    var xs = this.subdivide(outer_tl.x, inner_tl.x, 5);
+                    var ys = this.subdivide(inner_br.y, outer_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
+                // shell 10
+                {
+                    var xs = this.subdivide(outer_tl.x, inner_tl.x, 5);
+                    var ys = this.subdivide(inner_tl.y - size, inner_br.y, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
+                // shell 11
+                {
+                    var xs = this.subdivide(outer_tl.x, inner_tl.x, 5);
+                    var ys = this.subdivide(inner_tl.y, inner_tl.y - size, 5);
+                    var us = this.subdivide(0, 1, 5);
+                    var vs = this.subdivide(0, 1, 5);
+                    var offset = vertices.length / 3;
+                    this.pushVertices(xs, ys, vertices);
+                    this.pushUVs(us, vs, uvs);
+                    this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
-            }
-            // bottom left
-            {
-                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
-                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
-                }
-            }
-            // bot mid
-            {
-                var xs = [-1, 1]; // left to right
-                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
-                }
-            }
-            // bot right
-            {
-                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
-                var ys = [-1, -this.planesize / this.transform.scale.y]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
-                }
-            }
-            // mid left
-            {
-                var xs = [-this.planesize / this.transform.scale.x, -1]; // left to right
-                var ys = [1, -1]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
-                }
-            }
-            // mid right
-            {
-                var xs = [1, this.planesize / this.transform.scale.x]; // left to right
-                var ys = [1, -1]; // top to bottom
-                // uvs are incorrect but whatever
-                var us = [0, 1]; // left to right
-                var vs = [0, 1]; // top to bottom
-                // 64 vertices per shell, subdivide 6 times
-                for (var iter = 0; iter < 6; iter++) {
-                    var subdivided = [];
-                    for (var i = 0; i < ys.length - 1; i++) {
-                        subdivided.push(ys[i]);
-                        subdivided.push((ys[i] + ys[i + 1]) / 2);
-                    }
-                    subdivided.push(ys[ys.length - 1]);
-                    ys = subdivided;
-                    var subdivided_vs = [];
-                    for (var i = 0; i < vs.length - 1; i++) {
-                        subdivided_vs.push(vs[i]);
-                        subdivided_vs.push((vs[i] + vs[i + 1]) / 2);
-                    }
-                    subdivided_vs.push(vs[vs.length - 1]);
-                    vs = subdivided_vs;
-                }
-                // combine xys into vertex position array
-                // going left to right, top to bottom (row major flat array)
-                var offset = vertices.length / 3;
-                for (var i = 0; i < ys.length; i++) {
-                    for (var j = 0; j < xs.length; j++) {
-                        vertices.push(xs[j]);
-                        vertices.push(0);
-                        vertices.push(ys[i]);
-                    }
-                }
-                for (var i = 0; i < vs.length; i++) {
-                    for (var j = 0; j < us.length; j++) {
-                        uvs.push(us[j]);
-                        uvs.push(vs[i]);
-                    }
-                }
-                // push two triangles (1 quad) each iteration
-                for (var i = 0; i < vs.length - 1; i++) {
-                    for (var j = 0; j < us.length - 1; j++) {
-                        // *-*
-                        //  \|
-                        //   *
-                        planeVertexIndices.push(offset + i * us.length + j); // top left
-                        planeVertexIndices.push(offset + i * us.length + j + 1); // top right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        // *
-                        // |\
-                        // *-*
-                        planeVertexIndices.push(offset + i * us.length * 1 + j); // top left
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j + 1); // bottom right
-                        planeVertexIndices.push(offset + (i + 1) * us.length + j); // bottom left
-                    }
-                }
+                lastSize *= 2;
+                inner_tl = outer_tl;
+                inner_br = outer_br;
             }
             this.renderData.vertices = new Float32Array(vertices);
             this.renderData.textureCoords = new Float32Array(uvs);
@@ -4798,7 +4503,7 @@ function StartSky() {
         skyScene = new Scene(null, null);
         Scene.setActiveScene(skyScene);
         // ocean
-        skyScene.addRenderable(new InfinitePlane(250, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 8, v: 8 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+        skyScene.addRenderable(new InfinitePlane(16, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
     }
 }
 //# sourceMappingURL=app.js.map

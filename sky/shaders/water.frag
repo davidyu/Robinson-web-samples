@@ -13,15 +13,15 @@ uniform highp mat3 uNormalMVMatrix;    // inverse model view matrix
 uniform samplerCube environment;
 uniform float environmentMipMaps;
 
-const   float sun_size = sqrt( 1.0 / 3.0 );  // radius of sun sphere
-const   vec3  sea_base_color  = vec3(0.1,0.19,0.22);
-const   vec3  sea_water_color = vec3(0.8,0.9,0.6);
+const   vec3  sun_light_dir = normalize( vec3( 0.0, 1.0, 0.4 ) );  // radius of sun sphere
+const   vec3  sea_base_color  = vec3( 0.1,0.19,0.22 );
+const   vec3  sea_water_color = vec3( 0.8,0.9,0.6 );
 
-const float sea_speed = 3.0;
+const float sea_speed = 2.0;
 const float sea_choppiness = 4.0;
-const float sea_frequency = 0.06;
+const float sea_frequency = 0.1;
 const float sea_amplitude = 0.6;
-const float sea_scale = 0.5;
+const float sea_scale = 0.6;
 
 float diffuse( vec3 normal, vec3 light, float p ) {
     return pow( dot( normal, light ) * 0.4 + 0.6, p );
@@ -86,11 +86,9 @@ float height_detailed( vec2 p )
     float amp  = sea_amplitude;
     float choppiness = sea_choppiness;
 
-    p.x *= 0.75;
-
     const mat2 octave_matrix = mat2( 1.6, 1.2, -1.2, 1.6 );
     float d, height = 0.0;
-    for ( int i = 0; i < 5; i++ ) {
+    for ( int i = 0; i < 6; i++ ) {
         d = octave( ( p + uTime * sea_speed ) * freq, choppiness ), 
         d += octave( ( p - uTime * sea_speed ) * freq, choppiness ), 
         height += d * amp;
@@ -118,29 +116,80 @@ float get_specular( vec3 n, vec3 l, vec3 e, float s ) {
     return pow( max ( dot( reflect( e, n ), l ), 0.0 ), s ) * nrm;
 }
 
+float foam( vec3 pos )
+{
+    float freq = sea_frequency;
+    float amp  = sea_amplitude;
+    float choppiness = sea_choppiness;
+
+    vec2 p = pos.xz * sea_scale;
+    const mat2 octave_matrix = mat2( 1.6, 1.2, -1.2, 1.6 );
+    float d, height = 0.0;
+    
+    float amp_sum = 0.0;
+    for ( int i = 0; i < 5; i++ ) {
+        d = octave( ( p + uTime * sea_speed ) * freq, choppiness ), 
+        d += octave( ( p - uTime * sea_speed ) * freq, choppiness ), 
+        height += d * amp;
+        p *= octave_matrix;
+        freq *= 1.9;
+        amp_sum += amp;
+        amp *= 0.33;
+        choppiness = mix( choppiness, 1.0, 0.2 );
+    }
+        
+    amp_sum += amp;
+    float f = max( 0.0, height - 0.5 * amp_sum ) / ( amp_sum );
+    
+    for ( int i = 0; i < 5; i++ ) {
+        f -= noise( p * float( i ) * 10.0) * 0.04;
+    }
+    
+    // SUPER SLOW FBM
+    // TOO MANY LOOPS
+    float v = 0.0;
+    float a = 0.5;
+    vec2 shift = vec2(100.0);
+    mat2 rot = mat2(cos(0.5), sin(0.5),
+                    -sin(0.5), cos(0.50));
+    p = pos.xz + uTime * sea_scale * sea_speed * 0.1;
+    for (int i = 0; i < 5; ++i) {
+        v += a * noise( p );
+        p = rot * p * 2.0 + shift;
+        a *= 0.5;
+    }
+    
+    f = f * ( ( v * v + 1.0 ) / 2.0 );
+
+    return pow( f, 5.0 );
+}
+
 void main( void ) {
+    float dist = length( cPosition_World - vPosition_World );
     vec3 view = normalize( -( vPosition.xyz / vPosition.w ) );
-    vec3 normal = normalize( uNormalMVMatrix * get_normal( vPosition_World.xz * sea_scale, 0.01 ) );
+
+    vec3 normal = normalize( uNormalMVMatrix * get_normal( vPosition_World.xz * sea_scale, dist * 0.001 ) );
 
     vec3 reflected = uInverseViewMatrix * ( -reflect( view, normal ) );
-    vec4 ibl_specular = textureCube( environment, reflected ) * 0.9;
+    vec4 ibl_specular = engamma( textureCube( environment, reflected ) * 0.9 );
     
-    vec3 lightdir = normalize( uVMatrix * vec4( vec3( sun_size ), 0 ) ).xyz;
+    vec3 lightdir = normalize( uVMatrix * vec4( sun_light_dir, 0 ) ).xyz;
 
-    vec4 refracted = vec4( sea_base_color + diffuse( normal, lightdir, 80.0 ) * sea_water_color * 0.12, 1.0 ); 
+    vec4 refracted = engamma( vec4( sea_base_color + diffuse( normal, lightdir, 80.0 ) * sea_water_color * 0.12, 1.0 ) ); 
 
     float fresnel = 1.0 - max(dot(-normal,-view),0.0);
     fresnel = pow(fresnel,3.0);
     
     vec4 color = mix( refracted, ibl_specular, fresnel );
 
-    float dist = length( cPosition_World.xz - vPosition_World.xz );
     float atten = max( 1.0 - dot( dist, dist ) * 0.0000015, 0.0 );
 
-    // foam
-    color += vec4( sea_water_color * ( height_detailed( vPosition_World.xz * sea_scale ) ) * 0.05 * atten, 1.0 );
+    color += engamma( vec4( sea_water_color * ( height_detailed( vPosition_World.xz * sea_scale ) ) * 0.05 * atten, 1.0 ) );
 
-    color += vec4( get_specular( normal, lightdir, -view, 100.0 ) ) * 0.5;
+    color += engamma( vec4( get_specular( normal, lightdir, -view, 100.0 ) ) * 0.35 );
+    
+    // actual foam
+    color = mix( color, vec4( 1.0, 1.0, 1.0, 1.0 ), 0.6 * foam( vPosition_World.xyz ) );
 
-    gl_FragColor = color;
+    gl_FragColor = degamma( color );
 }
