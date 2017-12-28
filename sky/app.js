@@ -3565,38 +3565,36 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["SIMPLE_VERTEX"] = 0] = "SIMPLE_VERTEX";
     SHADERTYPE[SHADERTYPE["LAMBERT_FRAGMENT"] = 1] = "LAMBERT_FRAGMENT";
     SHADERTYPE[SHADERTYPE["BLINN_PHONG_FRAGMENT"] = 2] = "BLINN_PHONG_FRAGMENT";
-    SHADERTYPE[SHADERTYPE["UNLIT_FRAG"] = 3] = "UNLIT_FRAG";
-    SHADERTYPE[SHADERTYPE["DEBUG_VERTEX"] = 4] = "DEBUG_VERTEX";
-    SHADERTYPE[SHADERTYPE["DEBUG_FRAGMENT"] = 5] = "DEBUG_FRAGMENT";
-    SHADERTYPE[SHADERTYPE["OREN_NAYAR_FRAGMENT"] = 6] = "OREN_NAYAR_FRAGMENT";
-    SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT"] = 7] = "COOK_TORRANCE_FRAGMENT";
-    SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT_NO_EXT"] = 8] = "COOK_TORRANCE_FRAGMENT_NO_EXT";
-    SHADERTYPE[SHADERTYPE["UTILS"] = 9] = "UTILS";
-    SHADERTYPE[SHADERTYPE["SKYBOX_VERTEX"] = 10] = "SKYBOX_VERTEX";
-    SHADERTYPE[SHADERTYPE["SKYBOX_FRAG"] = 11] = "SKYBOX_FRAG";
-    SHADERTYPE[SHADERTYPE["SKY_FRAG"] = 12] = "SKY_FRAG";
-    SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 13] = "CUBE_SH_FRAG";
-    SHADERTYPE[SHADERTYPE["PASSTHROUGH_VERT"] = 14] = "PASSTHROUGH_VERT";
-    SHADERTYPE[SHADERTYPE["WATER_VERT"] = 15] = "WATER_VERT";
-    SHADERTYPE[SHADERTYPE["SS_QUAD_VERT"] = 16] = "SS_QUAD_VERT";
-    SHADERTYPE[SHADERTYPE["WATER_FRAG"] = 17] = "WATER_FRAG";
-    SHADERTYPE[SHADERTYPE["WATER_SS_FRAG"] = 18] = "WATER_SS_FRAG";
+    SHADERTYPE[SHADERTYPE["DEBUG_VERTEX"] = 3] = "DEBUG_VERTEX";
+    SHADERTYPE[SHADERTYPE["DEBUG_FRAGMENT"] = 4] = "DEBUG_FRAGMENT";
+    SHADERTYPE[SHADERTYPE["OREN_NAYAR_FRAGMENT"] = 5] = "OREN_NAYAR_FRAGMENT";
+    SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT"] = 6] = "COOK_TORRANCE_FRAGMENT";
+    SHADERTYPE[SHADERTYPE["COOK_TORRANCE_FRAGMENT_NO_EXT"] = 7] = "COOK_TORRANCE_FRAGMENT_NO_EXT";
+    SHADERTYPE[SHADERTYPE["UTILS"] = 8] = "UTILS";
+    SHADERTYPE[SHADERTYPE["SKYBOX_VERTEX"] = 9] = "SKYBOX_VERTEX";
+    SHADERTYPE[SHADERTYPE["SKYBOX_FRAG"] = 10] = "SKYBOX_FRAG";
+    SHADERTYPE[SHADERTYPE["SKY_FRAG"] = 11] = "SKY_FRAG";
+    SHADERTYPE[SHADERTYPE["CUBE_SH_FRAG"] = 12] = "CUBE_SH_FRAG";
+    SHADERTYPE[SHADERTYPE["PASSTHROUGH_VERT"] = 13] = "PASSTHROUGH_VERT";
+    SHADERTYPE[SHADERTYPE["WATER_VERT"] = 14] = "WATER_VERT";
+    SHADERTYPE[SHADERTYPE["SS_QUAD_VERT"] = 15] = "SS_QUAD_VERT";
+    SHADERTYPE[SHADERTYPE["WATER_FRAG"] = 16] = "WATER_FRAG";
+    SHADERTYPE[SHADERTYPE["WATER_SS_FRAG"] = 17] = "WATER_SS_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
 (function (SHADER_PROGRAM) {
     SHADER_PROGRAM[SHADER_PROGRAM["DEBUG"] = 0] = "DEBUG";
-    SHADER_PROGRAM[SHADER_PROGRAM["UNLIT"] = 1] = "UNLIT";
-    SHADER_PROGRAM[SHADER_PROGRAM["LAMBERT"] = 2] = "LAMBERT";
-    SHADER_PROGRAM[SHADER_PROGRAM["OREN_NAYAR"] = 3] = "OREN_NAYAR";
-    SHADER_PROGRAM[SHADER_PROGRAM["BLINN_PHONG"] = 4] = "BLINN_PHONG";
-    SHADER_PROGRAM[SHADER_PROGRAM["COOK_TORRANCE"] = 5] = "COOK_TORRANCE";
-    SHADER_PROGRAM[SHADER_PROGRAM["SKYBOX"] = 6] = "SKYBOX";
-    SHADER_PROGRAM[SHADER_PROGRAM["SKY"] = 7] = "SKY";
-    SHADER_PROGRAM[SHADER_PROGRAM["WATER"] = 8] = "WATER";
-    SHADER_PROGRAM[SHADER_PROGRAM["WATER_SS"] = 9] = "WATER_SS";
-    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 10] = "SHADOWMAP";
-    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 11] = "CUBE_SH";
+    SHADER_PROGRAM[SHADER_PROGRAM["LAMBERT"] = 1] = "LAMBERT";
+    SHADER_PROGRAM[SHADER_PROGRAM["OREN_NAYAR"] = 2] = "OREN_NAYAR";
+    SHADER_PROGRAM[SHADER_PROGRAM["BLINN_PHONG"] = 3] = "BLINN_PHONG";
+    SHADER_PROGRAM[SHADER_PROGRAM["COOK_TORRANCE"] = 4] = "COOK_TORRANCE";
+    SHADER_PROGRAM[SHADER_PROGRAM["SKYBOX"] = 5] = "SKYBOX";
+    SHADER_PROGRAM[SHADER_PROGRAM["SKY"] = 6] = "SKY";
+    SHADER_PROGRAM[SHADER_PROGRAM["WATER"] = 7] = "WATER";
+    SHADER_PROGRAM[SHADER_PROGRAM["WATER_SS"] = 8] = "WATER_SS";
+    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 9] = "SHADOWMAP";
+    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 10] = "CUBE_SH";
 })(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
@@ -3635,7 +3633,6 @@ var ShaderRepository = (function () {
         var _this = this;
         this.asyncLoadShader("basic.vert", SHADERTYPE.SIMPLE_VERTEX, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("debug.vert", SHADERTYPE.DEBUG_VERTEX, function (stype, contents) { _this.shaderLoaded(stype, contents); });
-        this.asyncLoadShader("unlit.frag", SHADERTYPE.UNLIT_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("lambert.frag", SHADERTYPE.LAMBERT_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("blinn-phong.frag", SHADERTYPE.BLINN_PHONG_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("debug.frag", SHADERTYPE.DEBUG_FRAGMENT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
@@ -3827,14 +3824,6 @@ var Renderer = (function () {
         this.programData[SHADER_PROGRAM.CUBE_SH] = new ShaderProgramData();
         this.programData[SHADER_PROGRAM.CUBE_SH].program = cubeMapSHProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.CUBE_SH);
-        var unlitProgram = this.compileShaderProgram(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.UNLIT_FRAG].source);
-        if (unlitProgram == null) {
-            alert("Unlit shader compilation failed. Please check the log for details.");
-            success = false;
-        }
-        this.programData[SHADER_PROGRAM.UNLIT] = new ShaderProgramData();
-        this.programData[SHADER_PROGRAM.UNLIT].program = unlitProgram;
-        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.UNLIT);
         {
         }
         this.vertexBuffer = gl.createBuffer();
@@ -4110,7 +4099,7 @@ var Renderer = (function () {
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
     };
     Renderer.prototype.renderFullScreenTexture = function (gl, texture) {
-        this.useProgram(gl, SHADER_PROGRAM.UNLIT);
+        // this.useProgram( gl, SHADER_PROGRAM.UNLIT );
         var fullscreen = new Quad();
         fullscreen.rebuildRenderData();
         var shaderVariables = this.programData[this.currentProgram].uniforms;

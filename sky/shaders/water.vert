@@ -9,10 +9,12 @@ uniform highp mat3 uInverseViewMatrix;
 uniform highp mat3 uNormalMVMatrix;    // inverse model view matrix
 
 uniform mediump float uTime;
+uniform mediump vec4 cPosition_World;
 
 varying mediump vec3 vDirection;
 varying mediump vec4 vPosition;
 varying mediump vec4 vPosition_World;
+varying mediump float vAmp;
 
 const float sea_speed = 2.0;
 const float sea_choppiness = 4.0;
@@ -64,15 +66,17 @@ float noise( in vec2 p ) {
                 u.y);
 }
 
+// @return: float in [0, 1]
 float octave( vec2 uv, float choppiness )
 {
     uv += noise( uv );
-    vec2 wave  = 1.0 - abs( sin( uv ) );
-    vec2 wave2 = abs( cos( uv ) );
-    wave = mix( wave, wave2, wave ); // ????????????????????
+    vec2 wave  = 1.0 - abs( sin( uv ) ); // 0.0 to 1.0
+    vec2 wave2 = abs( cos( uv ) );       // 0.0 to 1.0
+    wave = mix( wave, wave2, wave );     // 0.0 to 1.0
     return pow( 1.0 - pow( wave.x * wave.y, 0.65 ), choppiness );
 }
 
+// @return: float in [0, 2 * amp * iters]
 float height( vec2 p )
 {
     float freq = sea_frequency;
@@ -81,7 +85,8 @@ float height( vec2 p )
 
     const mat2 octave_matrix = mat2( 1.6, 1.2, -1.2, 1.6 );
     float d, height = 0.0;
-    for ( int i = 0; i < 3; i++ ) {
+    const int ITER = 3; // coarser iterations for wave height
+    for ( int i = 0; i < ITER; i++ ) {
         d  = octave( ( p + uTime * sea_speed ) * freq, choppiness ), 
         d += octave( ( p - uTime * sea_speed ) * freq, choppiness ), 
         height += d * amp;
@@ -101,7 +106,8 @@ void main() {
     vPosition = uMMatrix * vPosition;
 
     // apply water noise height offset
-    vPosition.y = 2.5 * height( vPosition.xz * sea_scale );
+    float h = height( vPosition.xz * sea_scale );
+    vPosition.y = 2.5 * h;
 
     // cache world position
     vPosition_World = vPosition;
