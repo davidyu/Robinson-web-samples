@@ -9,16 +9,18 @@ uniform highp mat3 uInverseViewMatrix;
 uniform highp mat3 uNormalMVMatrix;    // inverse model view matrix
 
 uniform mediump float uTime;
+uniform mediump vec4 cPosition_World;
 
 varying mediump vec3 vDirection;
 varying mediump vec4 vPosition;
 varying mediump vec4 vPosition_World;
-varying mediump vec3 vNormal;
+varying mediump float vAmp;
 
-const float sea_speed = 3.0;
-const float sea_choppiness = 1.0;
-const float sea_frequency = 0.15;
-const float sea_amplitude = 1.2;
+const float sea_speed = 2.0;
+const float sea_choppiness = 4.0;
+const float sea_frequency = 0.1;
+const float sea_amplitude = 0.6;
+const float sea_scale = 0.6;
 
 // based on Shadertoy "Seascape" entry by TDM
 
@@ -64,28 +66,29 @@ float noise( in vec2 p ) {
                 u.y);
 }
 
+// @return: float in [0, 1]
 float octave( vec2 uv, float choppiness )
 {
     uv += noise( uv );
-    vec2 wave  = 1.0 - abs( sin( uv ) );
-    vec2 wave2 = abs( cos( uv ) );
-    wave = mix( wave, wave2, wave ); // ????????????????????
+    vec2 wave  = 1.0 - abs( sin( uv ) ); // 0.0 to 1.0
+    vec2 wave2 = abs( cos( uv ) );       // 0.0 to 1.0
+    wave = mix( wave, wave2, wave );     // 0.0 to 1.0
     return pow( 1.0 - pow( wave.x * wave.y, 0.65 ), choppiness );
 }
 
+// @return: float in [0, 2 * amp * iters]
 float height( vec2 p )
 {
     float freq = sea_frequency;
     float amp  = sea_amplitude;
     float choppiness = sea_choppiness;
 
-    p.x *= 0.75;
-
     const mat2 octave_matrix = mat2( 1.6, 1.2, -1.2, 1.6 );
     float d, height = 0.0;
-    for ( int i = 0; i < 3; i++ ) {
-        d = octave( ( p + uTime * sea_speed ) * freq, choppiness ), 
-        // d += octave( ( p - uTime ) * freq, choppiness ), 
+    const int ITER = 3; // coarser iterations for wave height
+    for ( int i = 0; i < ITER; i++ ) {
+        d  = octave( ( p + uTime * sea_speed ) * freq, choppiness ), 
+        d += octave( ( p - uTime * sea_speed ) * freq, choppiness ), 
         height += d * amp;
         p *= octave_matrix;
         freq *= 1.9;
@@ -94,39 +97,6 @@ float height( vec2 p )
     }
 
     return height;
-}
-
-float height_detailed( vec2 p )
-{
-    float freq = sea_frequency;
-    float amp  = sea_amplitude;
-    float choppiness = sea_choppiness;
-
-    p.x *= 0.75;
-
-    const mat2 octave_matrix = mat2( 1.6, 1.2, -1.2, 1.6 );
-    float d, height = 0.0;
-    for ( int i = 0; i < 5; i++ ) {
-        d = octave( ( p + uTime ) * freq, choppiness ), 
-        d += octave( ( p - uTime ) * freq, choppiness ), 
-        height += d * amp;
-        p *= octave_matrix;
-        freq *= 1.9;
-        amp *= 0.22;
-        choppiness = mix( choppiness, 1.0, 0.2 );
-    }
-
-    return height;
-}
-
-vec3 normal( vec2 p, float epsilon )
-{
-    vec3 n;
-    float original = height( p );
-    n.x = height( vec2( p.x + epsilon, p.y ) ) - original;
-    n.z = height( vec2( p.x, p.y + epsilon ) ) - original;
-    n.y = epsilon;
-    return normalize( n );
 }
 
 void main() {
@@ -134,16 +104,16 @@ void main() {
 
     // transform from local to world
     vPosition = uMMatrix * vPosition;
-    vPosition.y += height( vPosition.xz );
+
+    // apply water noise height offset
+    float h = height( vPosition.xz * sea_scale );
+    vPosition.y = 2.5 * h;
+
+    // cache world position
     vPosition_World = vPosition;
 
     // then world to eye
     vPosition = uVMatrix * vPosition;
-
-    vNormal = uNormalMVMatrix * aVertexNormal;
-
-    // reproduce the eye/camera aim, per vertex, which is automatically interpolated to be per-pixel when we're in the fragment shader
-    vDirection = uInverseViewMatrix * ( uInverseProjectionMatrix * vec4( aVertexPosition, 1.0 ) ).xyz;
 
     gl_Position = uPMatrix * vPosition;
 }
