@@ -29,7 +29,6 @@ out vec4 fragColor;
 
 #define WORLEY_SAMPLE_MAX 12.0
 float worley(vec3 x) {
-    //return texture( uWorleyNoise, mod( x, vec3( WORLEY_SAMPLE_MAX ) ) / vec3( WORLEY_SAMPLE_MAX ) ).g;
     return texture( uWorleyNoise, fract( x / vec3( WORLEY_SAMPLE_MAX ) ) ).r;
 }
 
@@ -113,6 +112,11 @@ vec4 clouds( vec3 v )
     return acc;
 }
 
+vec3 desaturate( vec3 color, float desaturation ) {
+    color = mix( vec3( 0.3, 0.59, 0.11 ) * color, color, desaturation );
+    return color;
+}
+
 void main() {
     // get the eye lookat vector
     vec3 eye = normalize( vDirection );
@@ -131,6 +135,8 @@ void main() {
     vec3 sky = vec3( pow( 1.0 - blueness, 2.0 )         // less red as we move up, quadratic
                    , 1.0 - blueness                     // less green as we move up, linear
                    , 0.6 + ( 1.0 - blueness ) * 0.4 );  // blue depends on how far up we are
+
+    sky = desaturate( sky, uCloudiness );
 
     sky += sun( eye );
     vec4 cl = clouds( eye );

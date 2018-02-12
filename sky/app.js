@@ -2795,6 +2795,7 @@ var WaterMaterial = /** @class */ (function (_super) {
         _this.emissive = emissive;
         _this.shininess = shininess;
         _this.screenspace = screenspace;
+        _this.speed = 1.0;
         return _this;
     }
     return WaterMaterial;
@@ -4143,6 +4144,7 @@ var Renderer = /** @class */ (function () {
                     _this.useProgram(gl, SHADER_PROGRAM.WATER_SS);
                     var shaderVariables_5 = _this.programData[_this.currentProgram].uniforms;
                     gl.uniform1f(shaderVariables_5.uTime, scene.time);
+                    gl.uniform1f(shaderVariables_5.uCloudiness, scene.cloudiness);
                     var inverseProjectionMatrix = perspective.invert();
                     gl.uniformMatrix4fv(shaderVariables_5.uInverseProjection, false, inverseProjectionMatrix.m);
                 }
@@ -4150,6 +4152,7 @@ var Renderer = /** @class */ (function () {
                     _this.useProgram(gl, SHADER_PROGRAM.WATER);
                     var shaderVariables_6 = _this.programData[_this.currentProgram].uniforms;
                     gl.uniform1f(shaderVariables_6.uTime, scene.time);
+                    gl.uniform1f(shaderVariables_6.uCloudiness, scene.cloudiness);
                 }
             }
             else if (p.material instanceof NoiseMaterial) {
@@ -4900,12 +4903,12 @@ function updateAndDraw(t) {
 }
 function StartSky() {
     if (app == null) {
+        var params = {
+            vp: document.getElementById("big-viewport"),
+            orbitCenter: new gml.Vec4(0, 5, 0, 1),
+            orbitDistance: 0.001
+        };
         var shaderRepo = new ShaderRepository(function (repo) {
-            var params = {
-              vp: document.getElementById("big-viewport"),
-              orbitCenter: new gml.Vec4(0, 5, 0, 1),
-              orbitDistance: 0.001
-            };
             app = new SkyApp(params, repo);
             var gl = app.renderer.context;
             app.editor.install();
@@ -4933,8 +4936,7 @@ function StartSky() {
                                                                 , new gml.Vec4( 1.0, 1.0, 1.0, 1 )
                                                                 , new gml.Vec4( 1.0, 1.0, 1.0, 1 )
                                                                 , 1.53
-                                                                , true ) ) );
-             */
+                                                                , true ) ) ); */
         });
     }
 }
