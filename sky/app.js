@@ -4900,12 +4900,12 @@ function updateAndDraw(t) {
 }
 function StartSky() {
     if (app == null) {
-        var params = {
-            vp: document.getElementById("big-viewport"),
-            orbitCenter: new gml.Vec4(0, 5, 0, 1),
-            orbitDistance: 0.001
-        };
         var shaderRepo = new ShaderRepository(function (repo) {
+            var params = {
+              vp: document.getElementById("big-viewport"),
+              orbitCenter: new gml.Vec4(0, 5, 0, 1),
+              orbitDistance: 0.001
+            };
             app = new SkyApp(params, repo);
             var gl = app.renderer.context;
             app.editor.install();
