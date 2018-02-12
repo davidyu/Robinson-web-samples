@@ -1,39 +1,44 @@
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var Camera = (function () {
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var Camera = /** @class */ (function () {
     function Camera(position, aim, up, right) {
         this.matrix = gml.makeLookAt(position, aim, up, right);
     }
     Object.defineProperty(Camera.prototype, "pos", {
         get: function () {
-            return this.matrix.row(3);
+            return this.matrix.column(3).negate();
         },
         set: function (val) {
-            this.matrix.setColumn(3, val);
+            this.matrix.setColumn(3, val.negate().normalized);
         },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(Camera.prototype, "aim", {
         get: function () {
-            return this.matrix.row(2);
+            return this.matrix.column(2);
         },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(Camera.prototype, "up", {
         get: function () {
-            return this.matrix.row(1);
+            return this.matrix.column(1);
         },
         enumerable: true,
         configurable: true
     });
     Object.defineProperty(Camera.prototype, "right", {
         get: function () {
-            return this.matrix.row(0);
+            return this.matrix.column(0);
         },
         enumerable: true,
         configurable: true
@@ -42,13 +47,13 @@ var Camera = (function () {
 }());
 var gml;
 (function (gml) {
+    var Halfspace;
     (function (Halfspace) {
         Halfspace[Halfspace["POSITIVE"] = 0] = "POSITIVE";
         Halfspace[Halfspace["NEGATIVE"] = 1] = "NEGATIVE";
         Halfspace[Halfspace["COINCIDENT"] = 2] = "COINCIDENT";
-    })(gml.Halfspace || (gml.Halfspace = {}));
-    var Halfspace = gml.Halfspace;
-    var Collision = (function () {
+    })(Halfspace = gml.Halfspace || (gml.Halfspace = {}));
+    var Collision = /** @class */ (function () {
         function Collision() {
         }
         /**
@@ -178,7 +183,7 @@ var gml;
 })(gml || (gml = {}));
 var gml;
 (function (gml) {
-    var Vector = (function () {
+    var Vector = /** @class */ (function () {
         function Vector(size) {
             var args = [];
             for (var _i = 1; _i < arguments.length; _i++) {
@@ -328,7 +333,7 @@ var gml;
 ///<reference path="vec.ts"/>
 var gml;
 (function (gml) {
-    var Matrix = (function () {
+    var Matrix = /** @class */ (function () {
         function Matrix(rows, cols) {
             var args = [];
             for (var _i = 2; _i < arguments.length; _i++) {
@@ -626,37 +631,38 @@ var gml;
 ///<reference path="../mat.ts"/>
 var gml;
 (function (gml) {
-    var Mat3 = (function (_super) {
+    var Mat3 = /** @class */ (function (_super) {
         __extends(Mat3, _super);
         function Mat3() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 3, 3);
+            var _this = _super.call(this, 3, 3) || this;
             if (args.length === 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
-                this.v[2] = arr[2];
-                this.v[3] = arr[3];
-                this.v[4] = arr[4];
-                this.v[5] = arr[5];
-                this.v[6] = arr[6];
-                this.v[7] = arr[7];
-                this.v[8] = arr[8];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
+                _this.v[2] = arr[2];
+                _this.v[3] = arr[3];
+                _this.v[4] = arr[4];
+                _this.v[5] = arr[5];
+                _this.v[6] = arr[6];
+                _this.v[7] = arr[7];
+                _this.v[8] = arr[8];
             }
             else {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
-                this.v[2] = args[2];
-                this.v[3] = args[3];
-                this.v[4] = args[4];
-                this.v[5] = args[5];
-                this.v[6] = args[6];
-                this.v[7] = args[7];
-                this.v[8] = args[8];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
+                _this.v[2] = args[2];
+                _this.v[3] = args[3];
+                _this.v[4] = args[4];
+                _this.v[5] = args[5];
+                _this.v[6] = args[6];
+                _this.v[7] = args[7];
+                _this.v[8] = args[8];
             }
+            return _this;
         }
         Object.defineProperty(Mat3.prototype, "r00", {
             get: function () {
@@ -878,51 +884,52 @@ var gml;
 ///<reference path="../mat.ts"/>
 var gml;
 (function (gml) {
-    var Mat4 = (function (_super) {
+    var Mat4 = /** @class */ (function (_super) {
         __extends(Mat4, _super);
         function Mat4() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 4, 4);
+            var _this = _super.call(this, 4, 4) || this;
             if (args.length === 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
-                this.v[2] = arr[2];
-                this.v[3] = arr[3];
-                this.v[4] = arr[4];
-                this.v[5] = arr[5];
-                this.v[6] = arr[6];
-                this.v[7] = arr[7];
-                this.v[8] = arr[8];
-                this.v[9] = arr[9];
-                this.v[10] = arr[10];
-                this.v[11] = arr[11];
-                this.v[12] = arr[12];
-                this.v[13] = arr[13];
-                this.v[14] = arr[14];
-                this.v[15] = arr[15];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
+                _this.v[2] = arr[2];
+                _this.v[3] = arr[3];
+                _this.v[4] = arr[4];
+                _this.v[5] = arr[5];
+                _this.v[6] = arr[6];
+                _this.v[7] = arr[7];
+                _this.v[8] = arr[8];
+                _this.v[9] = arr[9];
+                _this.v[10] = arr[10];
+                _this.v[11] = arr[11];
+                _this.v[12] = arr[12];
+                _this.v[13] = arr[13];
+                _this.v[14] = arr[14];
+                _this.v[15] = arr[15];
             }
             else {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
-                this.v[2] = args[2];
-                this.v[3] = args[3];
-                this.v[4] = args[4];
-                this.v[5] = args[5];
-                this.v[6] = args[6];
-                this.v[7] = args[7];
-                this.v[8] = args[8];
-                this.v[9] = args[9];
-                this.v[10] = args[10];
-                this.v[11] = args[11];
-                this.v[12] = args[12];
-                this.v[13] = args[13];
-                this.v[14] = args[14];
-                this.v[15] = args[15];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
+                _this.v[2] = args[2];
+                _this.v[3] = args[3];
+                _this.v[4] = args[4];
+                _this.v[5] = args[5];
+                _this.v[6] = args[6];
+                _this.v[7] = args[7];
+                _this.v[8] = args[8];
+                _this.v[9] = args[9];
+                _this.v[10] = args[10];
+                _this.v[11] = args[11];
+                _this.v[12] = args[12];
+                _this.v[13] = args[13];
+                _this.v[14] = args[14];
+                _this.v[15] = args[15];
             }
+            return _this;
         }
         Object.defineProperty(Mat4.prototype, "r00", {
             get: function () {
@@ -1523,7 +1530,7 @@ var gml;
 })(gml || (gml = {}));
 var gml;
 (function (gml) {
-    var Ray = (function () {
+    var Ray = /** @class */ (function () {
         function Ray(p, d) {
             this.point = p;
             this.direction = d;
@@ -1537,14 +1544,14 @@ var gml;
         return Ray;
     }());
     gml.Ray = Ray;
-    var Polygon = (function () {
+    var Polygon = /** @class */ (function () {
         function Polygon(points) {
             this.points = points;
         }
         return Polygon;
     }());
     gml.Polygon = Polygon;
-    var Plane = (function () {
+    var Plane = /** @class */ (function () {
         function Plane(normal, d) {
             this.normal = normal;
             this.d = d;
@@ -1559,23 +1566,24 @@ var gml;
 ///<reference path="../vec.ts"/>
 var gml;
 (function (gml) {
-    var Vec2 = (function (_super) {
+    var Vec2 = /** @class */ (function (_super) {
         __extends(Vec2, _super);
         function Vec2() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 2);
+            var _this = _super.call(this, 2) || this;
             if (args.length == 2) {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
             }
             else if (args.length == 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
             }
+            return _this;
         }
         Object.defineProperty(Vec2.prototype, "x", {
             get: function () {
@@ -1600,7 +1608,7 @@ var gml;
         Vec2.prototype.add = function () {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
             if (args.length == 2) {
                 return new Vec2(this.x + args[0], this.y + args[1]);
@@ -1664,6 +1672,16 @@ var gml;
             out.y = -lhs.y;
             return out;
         };
+        Vec2.distance = function (lhs, rhs) {
+            var dx = lhs.x - rhs.x;
+            var dy = lhs.y - rhs.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        };
+        Vec2.distsq = function (lhs, rhs) {
+            var dx = lhs.x - rhs.x;
+            var dy = lhs.y - rhs.y;
+            return dx * dx + dy * dy;
+        };
         Object.defineProperty(Vec2, "zero", {
             get: function () {
                 return new Vec2(0, 0);
@@ -1678,25 +1696,26 @@ var gml;
 ///<reference path="../vec.ts"/>
 var gml;
 (function (gml) {
-    var Vec3 = (function (_super) {
+    var Vec3 = /** @class */ (function (_super) {
         __extends(Vec3, _super);
         function Vec3() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 3);
+            var _this = _super.call(this, 3) || this;
             if (args.length == 3) {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
-                this.v[2] = args[2];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
+                _this.v[2] = args[2];
             }
             else if (args.length == 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
-                this.v[2] = arr[2];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
+                _this.v[2] = arr[2];
             }
+            return _this;
         }
         Object.defineProperty(Vec3.prototype, "x", {
             get: function () {
@@ -1768,7 +1787,7 @@ var gml;
         Vec3.prototype.add = function () {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
             if (args.length == 3) {
                 return new Vec3(this.x + args[0], this.y + args[1], this.z + args[2]);
@@ -1792,6 +1811,9 @@ var gml;
         Vec3.prototype.dot = function (rhs) {
             return this.x * rhs.x + this.y * rhs.y + this.z * rhs.z;
         };
+        Vec3.prototype.dot3 = function (x, y, z) {
+            return this.x * x + this.y * y + this.z * z;
+        };
         Vec3.prototype.cross = function (rhs) {
             return new Vec3(this.y * rhs.z - this.z * rhs.y, this.z * rhs.x - this.x * rhs.z, this.x * rhs.y - this.y * rhs.x);
         };
@@ -1809,6 +1831,18 @@ var gml;
         Vec3.randomInSphere = function (radius) {
             if (radius === void 0) { radius = 1; }
             return new Vec3(Math.random(), Math.random(), Math.random()).normalized.multiply(radius);
+        };
+        Vec3.distance = function (lhs, rhs) {
+            var dx = lhs.x - rhs.x;
+            var dy = lhs.y - rhs.y;
+            var dz = lhs.z - rhs.z;
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+        };
+        Vec3.distsq = function (lhs, rhs) {
+            var dx = lhs.x - rhs.x;
+            var dy = lhs.y - rhs.y;
+            var dz = lhs.z - rhs.z;
+            return dx * dx + dy * dy + dz * dz;
         };
         Vec3.add = function (lhs, rhs, out) {
             out.x = lhs.x + rhs.x;
@@ -1854,27 +1888,28 @@ var gml;
 /// <reference path='../vec.ts'/>
 var gml;
 (function (gml) {
-    var Vec4 = (function (_super) {
+    var Vec4 = /** @class */ (function (_super) {
         __extends(Vec4, _super);
         function Vec4() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 4);
+            var _this = _super.call(this, 4) || this;
             if (args.length == 4) {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
-                this.v[2] = args[2];
-                this.v[3] = args[3];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
+                _this.v[2] = args[2];
+                _this.v[3] = args[3];
             }
             else if (args.length == 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
-                this.v[2] = arr[2];
-                this.v[3] = arr[3];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
+                _this.v[2] = arr[2];
+                _this.v[3] = arr[3];
             }
+            return _this;
         }
         Object.defineProperty(Vec4.prototype, "x", {
             get: function () {
@@ -1973,7 +2008,7 @@ var gml;
         Vec4.prototype.add = function () {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
             if (args.length == 4) {
                 return new Vec4(this.x + args[0], this.y + args[1], this.z + args[2], this.w + args[3]);
@@ -2120,7 +2155,7 @@ var gml;
     }
     gml.fromDegrees = fromDegrees;
     // implementation detail; no need to care about these classes
-    var Degree = (function () {
+    var Degree = /** @class */ (function () {
         function Degree(deg) {
             this.v = deg;
         }
@@ -2165,7 +2200,7 @@ var gml;
         });
         return Degree;
     }());
-    var Radian = (function () {
+    var Radian = /** @class */ (function () {
         function Radian(rad) {
             this.v = rad;
         }
@@ -2213,27 +2248,28 @@ var gml;
 ///<reference path="vec.ts"/>
 var gml;
 (function (gml) {
-    var Color = (function (_super) {
+    var Color = /** @class */ (function (_super) {
         __extends(Color, _super);
         function Color() {
             var args = [];
             for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
+                args[_i] = arguments[_i];
             }
-            _super.call(this, 4);
+            var _this = _super.call(this, 4) || this;
             if (args.length == 4) {
-                this.v[0] = args[0];
-                this.v[1] = args[1];
-                this.v[2] = args[2];
-                this.v[3] = args[3];
+                _this.v[0] = args[0];
+                _this.v[1] = args[1];
+                _this.v[2] = args[2];
+                _this.v[3] = args[3];
             }
             else if (args.length == 1) {
                 var arr = args[0];
-                this.v[0] = arr[0];
-                this.v[1] = arr[1];
-                this.v[2] = arr[2];
-                this.v[3] = arr[3];
+                _this.v[0] = arr[0];
+                _this.v[1] = arr[1];
+                _this.v[2] = arr[2];
+                _this.v[3] = arr[3];
             }
+            return _this;
         }
         Object.defineProperty(Color.prototype, "r", {
             get: function () {
@@ -2331,7 +2367,7 @@ var gml;
      * All methods assume a normalized input t (time) between 0 and 1
      * and returns an output t' between 0 and 1.
      */
-    var Easing = (function () {
+    var Easing = /** @class */ (function () {
         function Easing() {
         }
         Easing.QuadIn = function (t) {
@@ -2642,15 +2678,19 @@ var gml;
         return Math.abs(n) < 0.0001 ? 0 : n > 0 ? 1 : -1;
     }
     gml.sign = sign;
+    function fract(n) {
+        return 0;
+    }
+    gml.fract = fract;
 })(gml || (gml = {}));
-var Material = (function () {
+var Material = /** @class */ (function () {
     function Material() {
         this.isTextureMapped = false;
     }
     return Material;
 }());
 ///<reference path='material.ts' />
-var BlinnPhongMaterial = (function (_super) {
+var BlinnPhongMaterial = /** @class */ (function (_super) {
     __extends(BlinnPhongMaterial, _super);
     function BlinnPhongMaterial(ambient, diffuse, specular, emissive, shininess) {
         if (ambient === void 0) { ambient = new gml.Vec4(0.5, 0.5, 0.5, 1); }
@@ -2658,63 +2698,88 @@ var BlinnPhongMaterial = (function (_super) {
         if (specular === void 0) { specular = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (emissive === void 0) { emissive = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (shininess === void 0) { shininess = 1.0; }
-        _super.call(this);
-        this.ambient = ambient;
-        this.diffuse = diffuse;
-        this.specular = specular;
-        this.emissive = emissive;
-        this.shininess = shininess;
+        var _this = _super.call(this) || this;
+        _this.ambient = ambient;
+        _this.diffuse = diffuse;
+        _this.specular = specular;
+        _this.emissive = emissive;
+        _this.shininess = shininess;
+        return _this;
     }
     return BlinnPhongMaterial;
 }(Material));
 ///<reference path='material.ts' />
-var CookTorranceMaterial = (function (_super) {
+var CookTorranceMaterial = /** @class */ (function (_super) {
     __extends(CookTorranceMaterial, _super);
     function CookTorranceMaterial(diffuse, specular, roughness, fresnel) {
         if (diffuse === void 0) { diffuse = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (specular === void 0) { specular = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (roughness === void 0) { roughness = 0.5; }
         if (fresnel === void 0) { fresnel = 1.586; }
-        _super.call(this);
-        this.diffuse = diffuse;
-        this.specular = specular;
-        this.roughness = roughness;
-        this.fresnel = fresnel;
+        var _this = _super.call(this) || this;
+        _this.diffuse = diffuse;
+        _this.specular = specular;
+        _this.roughness = roughness;
+        _this.fresnel = fresnel;
+        return _this;
     }
     return CookTorranceMaterial;
 }(Material));
 ///<reference path='material.ts' />
-var DebugMaterial = (function (_super) {
+var DebugMaterial = /** @class */ (function (_super) {
     __extends(DebugMaterial, _super);
     function DebugMaterial() {
-        _super.call(this);
+        return _super.call(this) || this;
     }
     return DebugMaterial;
 }(Material));
 ///<reference path='material.ts' />
-var LambertMaterial = (function (_super) {
+var LambertMaterial = /** @class */ (function (_super) {
     __extends(LambertMaterial, _super);
     function LambertMaterial(diffuse) {
         if (diffuse === void 0) { diffuse = new gml.Vec4(0.5, 0.5, 0.5, 1); }
-        _super.call(this);
-        this.diffuse = diffuse;
+        var _this = _super.call(this) || this;
+        _this.diffuse = diffuse;
+        return _this;
     }
     return LambertMaterial;
 }(Material));
 ///<reference path='material.ts' />
-var OrenNayarMaterial = (function (_super) {
+var NoiseMaterial = /** @class */ (function (_super) {
+    __extends(NoiseMaterial, _super);
+    function NoiseMaterial() {
+        var _this = _super.call(this) || this;
+        _this.layer = 0;
+        return _this;
+    }
+    return NoiseMaterial;
+}(Material));
+///<reference path='material.ts' />
+var OrenNayarMaterial = /** @class */ (function (_super) {
     __extends(OrenNayarMaterial, _super);
     function OrenNayarMaterial(diffuse, roughness) {
         if (diffuse === void 0) { diffuse = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (roughness === void 0) { roughness = 0.5; }
-        _super.call(this);
-        this.diffuse = diffuse;
-        this.roughness = roughness;
+        var _this = _super.call(this) || this;
+        _this.diffuse = diffuse;
+        _this.roughness = roughness;
+        return _this;
     }
     return OrenNayarMaterial;
 }(Material));
 ///<reference path='material.ts' />
-var WaterMaterial = (function (_super) {
+var VolumeMaterial = /** @class */ (function (_super) {
+    __extends(VolumeMaterial, _super);
+    function VolumeMaterial(volumeTexture) {
+        var _this = _super.call(this) || this;
+        _this.layer = 0;
+        _this.volumeTexture = volumeTexture;
+        return _this;
+    }
+    return VolumeMaterial;
+}(Material));
+///<reference path='material.ts' />
+var WaterMaterial = /** @class */ (function (_super) {
     __extends(WaterMaterial, _super);
     function WaterMaterial(ambient, diffuse, specular, emissive, shininess, screenspace) {
         if (ambient === void 0) { ambient = new gml.Vec4(0.5, 0.5, 0.5, 1); }
@@ -2723,20 +2788,21 @@ var WaterMaterial = (function (_super) {
         if (emissive === void 0) { emissive = new gml.Vec4(0.5, 0.5, 0.5, 1); }
         if (shininess === void 0) { shininess = 1.0; }
         if (screenspace === void 0) { screenspace = false; }
-        _super.call(this);
-        this.ambient = ambient;
-        this.diffuse = diffuse;
-        this.specular = specular;
-        this.emissive = emissive;
-        this.shininess = shininess;
-        this.screenspace = screenspace;
+        var _this = _super.call(this) || this;
+        _this.ambient = ambient;
+        _this.diffuse = diffuse;
+        _this.specular = specular;
+        _this.emissive = emissive;
+        _this.shininess = shininess;
+        _this.screenspace = screenspace;
+        return _this;
     }
     return WaterMaterial;
 }(Material));
 //
 // prim.ts
 // user editable primitive base interface
-var RenderData = (function () {
+var RenderData = /** @class */ (function () {
     function RenderData() {
         this.dirty = true;
         this.vertices = new Float32Array(0);
@@ -2744,10 +2810,37 @@ var RenderData = (function () {
         this.colors = new Float32Array(0);
         this.indices = new Uint32Array(0);
         this.isTextureMapped = false;
+        this.vertexBuffer = null;
+        this.vertexNormalBuffer = null;
+        this.vertexTexCoordBuffer = null;
+        this.indexBuffer = null;
     }
+    RenderData.prototype.rebuildBufferObjects = function (gl) {
+        // build the buffer objects
+        if (this.vertexBuffer == null) {
+            this.vertexBuffer = gl.createBuffer();
+        }
+        if (this.vertexNormalBuffer == null) {
+            this.vertexNormalBuffer = gl.createBuffer();
+        }
+        if (this.indexBuffer == null) {
+            this.indexBuffer = gl.createBuffer();
+        }
+        if (this.vertexTexCoordBuffer == null) {
+            this.vertexTexCoordBuffer = gl.createBuffer();
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.vertices, gl.STATIC_DRAW); // allocate and fill the buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.normals, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTexCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.textureCoords, gl.STATIC_DRAW);
+    };
     return RenderData;
 }());
-var Primitive = (function () {
+var Primitive = /** @class */ (function () {
     function Primitive() {
         this.transform = gml.Mat4.identity();
     }
@@ -2757,19 +2850,20 @@ var Primitive = (function () {
     return Primitive;
 }());
 ///<reference path='prim.ts' />
-var Cone = (function (_super) {
+var Cone = /** @class */ (function (_super) {
     __extends(Cone, _super);
     function Cone(size) {
         if (size === void 0) { size = 1; }
-        _super.call(this);
-        this.transform.scale = new gml.Vec3(size, size, size);
-        this.material = new BlinnPhongMaterial();
-        this.renderData = new RenderData();
+        var _this = _super.call(this) || this;
+        _this.transform.scale = new gml.Vec3(size, size, size);
+        _this.material = new BlinnPhongMaterial();
+        _this.renderData = new RenderData();
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
+        _this.renderData.dirty = true;
+        return _this;
     }
     // this should only be called by the renderer module
-    Cone.prototype.rebuildRenderData = function () {
+    Cone.prototype.rebuildRenderData = function (gl) {
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             // TODO share vertices between faces??
@@ -2855,26 +2949,28 @@ var Cone = (function (_super) {
                 20, 21, 22, 20, 22, 23 // left
             ];
             this.renderData.indices = new Uint16Array(cubeVertexIndices);
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return Cone;
 }(Primitive));
 ///<reference path='prim.ts' />
-var Cube = (function (_super) {
+var Cube = /** @class */ (function (_super) {
     __extends(Cube, _super);
     function Cube(size, position, mat) {
         if (size === void 0) { size = 1; }
         if (position === void 0) { position = gml.Vec4.origin; }
         if (mat === void 0) { mat = new BlinnPhongMaterial(); }
-        _super.call(this);
-        this.transform.scale = new gml.Vec3(size, size, size);
-        this.material = mat;
-        this.renderData = new RenderData();
+        var _this = _super.call(this) || this;
+        _this.transform.scale = new gml.Vec3(size, size, size);
+        _this.material = mat;
+        _this.renderData = new RenderData();
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
+        _this.renderData.dirty = true;
+        return _this;
     }
     // this should only be called by the renderer module
-    Cube.prototype.rebuildRenderData = function () {
+    Cube.prototype.rebuildRenderData = function (gl) {
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             // TODO share vertices between faces??
@@ -2986,13 +3082,14 @@ var Cube = (function (_super) {
                 20, 21, 22, 20, 22, 23 // left
             ];
             this.renderData.indices = new Uint16Array(cubeVertexIndices);
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return Cube;
 }(Primitive));
 ///<reference path='prim.ts' />
 // like a regular plane but with a large shell around the center subdivided plane
-var InfinitePlane = (function (_super) {
+var InfinitePlane = /** @class */ (function (_super) {
     __extends(InfinitePlane, _super);
     function InfinitePlane(size, layers, position, rotation, subdivisions, mat) {
         if (size === void 0) { size = 1; }
@@ -3001,11 +3098,11 @@ var InfinitePlane = (function (_super) {
         if (rotation === void 0) { rotation = null; }
         if (subdivisions === void 0) { subdivisions = { u: 0, v: 0 }; }
         if (mat === void 0) { mat = new BlinnPhongMaterial(); }
-        _super.call(this);
-        this.subdivs = subdivisions;
-        this.transform = gml.Mat4.identity();
-        this.planesize = 10000; // Not quite infinite :) but very large.
-        this.layers = layers;
+        var _this = _super.call(this) || this;
+        _this.subdivs = subdivisions;
+        _this.transform = gml.Mat4.identity();
+        _this.planesize = 10000; // Not quite infinite :) but very large.
+        _this.layers = layers;
         if (rotation != null) {
             var m = gml.Mat4.identity();
             var sx = Math.sin(rotation.x.toRadians());
@@ -3030,18 +3127,19 @@ var InfinitePlane = (function (_super) {
             m.tx = 0;
             m.ty = 0;
             m.tz = 0;
-            this.transform = m.multiply(this.transform);
+            _this.transform = m.multiply(_this.transform);
         }
         {
             var m = gml.Mat4.identity();
             m.scale = new gml.Vec3(size, size, size);
-            this.transform = m.multiply(this.transform);
+            _this.transform = m.multiply(_this.transform);
         }
-        this.transform.translation = position;
-        this.renderData = new RenderData();
-        this.material = mat;
+        _this.transform.translation = position;
+        _this.renderData = new RenderData();
+        _this.material = mat;
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
+        _this.renderData.dirty = true;
+        return _this;
     }
     InfinitePlane.prototype.subdivide = function (min, max, times) {
         var subdivided = [min, max];
@@ -3093,7 +3191,7 @@ var InfinitePlane = (function (_super) {
         }
     };
     // this should only be called by the renderer module
-    InfinitePlane.prototype.rebuildRenderData = function () {
+    InfinitePlane.prototype.rebuildRenderData = function (gl) {
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             var vertices = [];
@@ -3275,14 +3373,14 @@ var InfinitePlane = (function (_super) {
                 vertexNormals.push(0.0);
             }
             this.renderData.normals = new Float32Array(vertexNormals);
-            console.log(planeVertexIndices);
             this.renderData.indices = new Uint32Array(planeVertexIndices);
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return InfinitePlane;
 }(Primitive));
 ///<reference path='prim.ts' />
-var Plane = (function (_super) {
+var Plane = /** @class */ (function (_super) {
     __extends(Plane, _super);
     function Plane(size, position, rotation, subdivisions, mat) {
         if (size === void 0) { size = 1; }
@@ -3290,9 +3388,9 @@ var Plane = (function (_super) {
         if (rotation === void 0) { rotation = null; }
         if (subdivisions === void 0) { subdivisions = { u: 0, v: 0 }; }
         if (mat === void 0) { mat = new BlinnPhongMaterial(); }
-        _super.call(this);
-        this.transform = gml.Mat4.identity();
-        this.subdivs = subdivisions;
+        var _this = _super.call(this) || this;
+        _this.transform = gml.Mat4.identity();
+        _this.subdivs = subdivisions;
         if (rotation != null) {
             var m = gml.Mat4.identity();
             var sx = Math.sin(rotation.x.toRadians());
@@ -3317,21 +3415,22 @@ var Plane = (function (_super) {
             m.tx = 0;
             m.ty = 0;
             m.tz = 0;
-            this.transform = m.multiply(this.transform);
+            _this.transform = m.multiply(_this.transform);
         }
         {
             var m = gml.Mat4.identity();
             m.scale = new gml.Vec3(size, size, size);
-            this.transform = m.multiply(this.transform);
+            _this.transform = m.multiply(_this.transform);
         }
-        this.transform.translation = position;
-        this.renderData = new RenderData();
-        this.material = mat;
+        _this.transform.translation = position;
+        _this.renderData = new RenderData();
+        _this.material = mat;
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
+        _this.renderData.dirty = true;
+        return _this;
     }
     // this should only be called by the renderer module
-    Plane.prototype.rebuildRenderData = function () {
+    Plane.prototype.rebuildRenderData = function (gl) {
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             // By default 4-vertex plane (no subdivisions) is in XY plane with z = 0
@@ -3419,22 +3518,22 @@ var Plane = (function (_super) {
                     planeVertexIndices.push((i + 1) * us.length + j); // bottom left
                 }
             }
-            console.log(planeVertexIndices);
             this.renderData.indices = new Uint32Array(planeVertexIndices);
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return Plane;
 }(Primitive));
 ///<reference path='prim.ts' />
-var Quad = (function (_super) {
+var Quad = /** @class */ (function (_super) {
     __extends(Quad, _super);
     function Quad(size, position, rotation, mat) {
         if (size === void 0) { size = 1; }
         if (position === void 0) { position = gml.Vec4.origin; }
         if (rotation === void 0) { rotation = null; }
         if (mat === void 0) { mat = new BlinnPhongMaterial(); }
-        _super.call(this);
-        this.transform.scale = new gml.Vec3(size, size, size);
+        var _this = _super.call(this) || this;
+        _this.transform.scale = new gml.Vec3(size, size, size);
         if (rotation != null) {
             var m = gml.Mat4.identity();
             var sx = Math.sin(rotation.x.toRadians());
@@ -3459,16 +3558,17 @@ var Quad = (function (_super) {
             m.tx = 0;
             m.ty = 0;
             m.tz = 0;
-            this.transform = m.multiply(this.transform);
+            _this.transform = m.multiply(_this.transform);
         }
-        this.transform.translation = position;
-        this.renderData = new RenderData();
-        this.material = mat;
+        _this.transform.translation = position;
+        _this.renderData = new RenderData();
+        _this.material = mat;
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
+        _this.renderData.dirty = true;
+        return _this;
     }
     // this should only be called by the renderer module
-    Quad.prototype.rebuildRenderData = function () {
+    Quad.prototype.rebuildRenderData = function (gl) {
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             var vertices = [
@@ -3498,6 +3598,7 @@ var Quad = (function (_super) {
                 0, 1, 2, 0, 2, 3,
             ];
             this.renderData.indices = new Uint32Array(quadVertexIndices);
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return Quad;
@@ -3506,7 +3607,7 @@ var Quad = (function (_super) {
 //
 // sphere.ts
 // UV sphere (most basic sphere mesh)
-var Sphere = (function (_super) {
+var Sphere = /** @class */ (function (_super) {
     __extends(Sphere, _super);
     function Sphere(size, position, mat, parallels, meridians) {
         if (size === void 0) { size = 1; }
@@ -3514,20 +3615,22 @@ var Sphere = (function (_super) {
         if (mat === void 0) { mat = new BlinnPhongMaterial(); }
         if (parallels === void 0) { parallels = 15; }
         if (meridians === void 0) { meridians = 30; }
-        _super.call(this);
-        this.transform.scale = new gml.Vec3(size, size, size);
-        this.transform.translation = position;
-        this.material = mat;
-        this.renderData = new RenderData();
+        var _this = _super.call(this) || this;
+        _this.transform.scale = new gml.Vec3(size, size, size);
+        _this.transform.translation = position;
+        _this.material = mat;
+        _this.renderData = new RenderData();
         // trigger a rebuild when the renderer updates
-        this.renderData.dirty = true;
-        this.parallels = parallels;
-        this.meridians = meridians;
+        _this.renderData.dirty = true;
+        _this.parallels = parallels;
+        _this.meridians = meridians;
+        return _this;
     }
-    Sphere.prototype.rebuildRenderData = function () {
+    Sphere.prototype.rebuildRenderData = function (gl) {
         var vertices = [];
         var indices = [];
         if (this.renderData.dirty) {
+            this.renderData.dirty = false;
             for (var j = 0; j < this.parallels; j++) {
                 var parallel = Math.PI * j / (this.parallels - 1);
                 for (var i = 0; i < this.meridians; i++) {
@@ -3555,7 +3658,7 @@ var Sphere = (function (_super) {
             this.renderData.vertices = new Float32Array(vertices);
             this.renderData.normals = new Float32Array(vertices); // for a unit sphere located at 0,0,0, the normals are exactly the same as the vertices
             this.renderData.indices = new Uint32Array(indices);
-            this.renderData.dirty = false;
+            this.renderData.rebuildBufferObjects(gl);
         }
     };
     return Sphere;
@@ -3580,6 +3683,8 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["SS_QUAD_VERT"] = 15] = "SS_QUAD_VERT";
     SHADERTYPE[SHADERTYPE["WATER_FRAG"] = 16] = "WATER_FRAG";
     SHADERTYPE[SHADERTYPE["WATER_SS_FRAG"] = 17] = "WATER_SS_FRAG";
+    SHADERTYPE[SHADERTYPE["NOISE_WRITER_FRAG"] = 18] = "NOISE_WRITER_FRAG";
+    SHADERTYPE[SHADERTYPE["VOLUME_VIEWER_FRAG"] = 19] = "VOLUME_VIEWER_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
@@ -3593,8 +3698,9 @@ var SHADER_PROGRAM;
     SHADER_PROGRAM[SHADER_PROGRAM["SKY"] = 6] = "SKY";
     SHADER_PROGRAM[SHADER_PROGRAM["WATER"] = 7] = "WATER";
     SHADER_PROGRAM[SHADER_PROGRAM["WATER_SS"] = 8] = "WATER_SS";
-    SHADER_PROGRAM[SHADER_PROGRAM["SHADOWMAP"] = 9] = "SHADOWMAP";
-    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 10] = "CUBE_SH";
+    SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 9] = "CUBE_SH";
+    SHADER_PROGRAM[SHADER_PROGRAM["NOISE_WRITER"] = 10] = "NOISE_WRITER";
+    SHADER_PROGRAM[SHADER_PROGRAM["VOLUME_VIEWER"] = 11] = "VOLUME_VIEWER";
 })(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
@@ -3609,7 +3715,7 @@ var IRRADIANCE_PASS;
     IRRADIANCE_PASS[IRRADIANCE_PASS["IRRADIANCE_COMPUTE"] = 1] = "IRRADIANCE_COMPUTE";
 })(IRRADIANCE_PASS || (IRRADIANCE_PASS = {}));
 ;
-var ShaderFile = (function () {
+var ShaderFile = /** @class */ (function () {
     function ShaderFile(source, loaded) {
         if (source === void 0) { source = ""; }
         if (loaded === void 0) { loaded = false; }
@@ -3618,7 +3724,7 @@ var ShaderFile = (function () {
     }
     return ShaderFile;
 }());
-var ShaderRepository = (function () {
+var ShaderRepository = /** @class */ (function () {
     function ShaderRepository(loadDoneCallback) {
         this.loadDoneCallback = loadDoneCallback;
         this.files = [];
@@ -3649,6 +3755,8 @@ var ShaderRepository = (function () {
         this.asyncLoadShader("water.frag", SHADERTYPE.WATER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("screenspacequad.vert", SHADERTYPE.SS_QUAD_VERT, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("water_screenspace.frag", SHADERTYPE.WATER_SS_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("noise_writer.frag", SHADERTYPE.NOISE_WRITER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("volume_viewer.frag", SHADERTYPE.VOLUME_VIEWER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
     };
     ShaderRepository.prototype.asyncLoadShader = function (name, stype, loaded) {
         var req = new XMLHttpRequest();
@@ -3686,39 +3794,42 @@ var ShaderRepository = (function () {
     };
     return ShaderRepository;
 }());
-var ShaderSource = (function () {
+var ShaderSource = /** @class */ (function () {
     function ShaderSource(vs, fs) {
         this.vs = vs;
         this.fs = fs;
     }
     return ShaderSource;
 }());
-var ShaderMaterialProperties = (function () {
+var ShaderMaterialProperties = /** @class */ (function () {
     function ShaderMaterialProperties() {
     }
     return ShaderMaterialProperties;
 }());
-var ShaderLightProperties = (function () {
+var ShaderLightProperties = /** @class */ (function () {
     function ShaderLightProperties() {
     }
     return ShaderLightProperties;
 }());
-var ShaderUniforms = (function () {
+var ShaderUniforms = /** @class */ (function () {
     function ShaderUniforms() {
     }
     return ShaderUniforms;
 }());
-var ShaderProgramData = (function () {
-    function ShaderProgramData() {
+var ShaderProgramData = /** @class */ (function () {
+    function ShaderProgramData(vert, frag) {
+        this.vert = vert;
+        this.frag = frag;
         this.program = null;
         this.uniforms = new ShaderUniforms();
     }
     return ShaderProgramData;
 }());
-var Renderer = (function () {
+var Renderer = /** @class */ (function () {
     function Renderer(viewportElement, sr, backgroundColor) {
         if (backgroundColor === void 0) { backgroundColor = new gml.Vec4(0, 0, 0, 1); }
-        var gl = (viewportElement.getContext("experimental-webgl"));
+        this.repo = sr;
+        var gl = viewportElement.getContext("webgl2");
         gl.viewport(0, 0, viewportElement.width, viewportElement.height);
         this.viewportW = viewportElement.width;
         this.viewportH = viewportElement.height;
@@ -3743,7 +3854,7 @@ var Renderer = (function () {
             alert("Phong shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.BLINN_PHONG] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.BLINN_PHONG] = new ShaderProgramData(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.BLINN_PHONG_FRAGMENT].source);
         this.programData[SHADER_PROGRAM.BLINN_PHONG].program = phongProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.BLINN_PHONG);
         var lambertProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.LAMBERT_FRAGMENT].source);
@@ -3751,7 +3862,7 @@ var Renderer = (function () {
             alert("Lambert shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.LAMBERT] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.LAMBERT] = new ShaderProgramData(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.LAMBERT_FRAGMENT].source);
         this.programData[SHADER_PROGRAM.LAMBERT].program = lambertProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.LAMBERT);
         var debugProgram = this.compileShaderProgram(sr.files[SHADERTYPE.DEBUG_VERTEX].source, sr.files[SHADERTYPE.DEBUG_FRAGMENT].source);
@@ -3759,7 +3870,7 @@ var Renderer = (function () {
             alert("Debug shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.DEBUG] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.DEBUG] = new ShaderProgramData(sr.files[SHADERTYPE.DEBUG_VERTEX].source, sr.files[SHADERTYPE.DEBUG_FRAGMENT].source);
         this.programData[SHADER_PROGRAM.DEBUG].program = debugProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.DEBUG);
         var orenNayarProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.OREN_NAYAR_FRAGMENT].source);
@@ -3767,7 +3878,7 @@ var Renderer = (function () {
             alert("Oren-Nayar shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.OREN_NAYAR] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.OREN_NAYAR] = new ShaderProgramData(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.OREN_NAYAR_FRAGMENT].source);
         this.programData[SHADER_PROGRAM.OREN_NAYAR].program = orenNayarProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.OREN_NAYAR);
         var cookTorranceProgram = null;
@@ -3781,7 +3892,7 @@ var Renderer = (function () {
             alert("Cook-Torrance shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.COOK_TORRANCE] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.COOK_TORRANCE] = new ShaderProgramData(sr.files[SHADERTYPE.SIMPLE_VERTEX].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.COOK_TORRANCE_FRAGMENT_NO_EXT].source);
         this.programData[SHADER_PROGRAM.COOK_TORRANCE].program = cookTorranceProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.COOK_TORRANCE);
         var skyboxProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKYBOX_FRAG].source);
@@ -3789,7 +3900,7 @@ var Renderer = (function () {
             alert("Skybox shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.SKYBOX] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.SKYBOX] = new ShaderProgramData(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKYBOX_FRAG].source);
         this.programData[SHADER_PROGRAM.SKYBOX].program = skyboxProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.SKYBOX);
         var skyProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKY_FRAG].source);
@@ -3797,7 +3908,7 @@ var Renderer = (function () {
             alert("Sky shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.SKY] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.SKY] = new ShaderProgramData(sr.files[SHADERTYPE.SKYBOX_VERTEX].source, sr.files[SHADERTYPE.SKY_FRAG].source);
         this.programData[SHADER_PROGRAM.SKY].program = skyProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.SKY);
         var waterProgram = this.compileShaderProgram(sr.files[SHADERTYPE.WATER_VERT].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.WATER_FRAG].source);
@@ -3805,7 +3916,7 @@ var Renderer = (function () {
             alert("Water shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.WATER] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.WATER] = new ShaderProgramData(sr.files[SHADERTYPE.WATER_VERT].source, sr.files[SHADERTYPE.UTILS].source + sr.files[SHADERTYPE.WATER_FRAG].source);
         this.programData[SHADER_PROGRAM.WATER].program = waterProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER);
         var waterSSProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.WATER_SS_FRAG].source);
@@ -3813,25 +3924,51 @@ var Renderer = (function () {
             alert("Screenspace water compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.WATER_SS] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.WATER_SS] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.WATER_SS_FRAG].source);
         this.programData[SHADER_PROGRAM.WATER_SS].program = waterSSProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER_SS);
+        var noiseWriterProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.NOISE_WRITER_FRAG].source);
+        if (noiseWriterProgram == null) {
+            alert("Noise writer compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.NOISE_WRITER] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.NOISE_WRITER_FRAG].source);
+        this.programData[SHADER_PROGRAM.NOISE_WRITER].program = noiseWriterProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.NOISE_WRITER);
+        var volumeViewerProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.VOLUME_VIEWER_FRAG].source);
+        if (volumeViewerProgram == null) {
+            alert("Volume viewer compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.VOLUME_VIEWER] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.VOLUME_VIEWER_FRAG].source);
+        this.programData[SHADER_PROGRAM.VOLUME_VIEWER].program = volumeViewerProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.VOLUME_VIEWER);
         var cubeMapSHProgram = this.compileShaderProgram(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         if (cubeMapSHProgram == null) {
             alert("Cube map shader compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.CUBE_SH] = new ShaderProgramData();
+        this.programData[SHADER_PROGRAM.CUBE_SH] = new ShaderProgramData(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         this.programData[SHADER_PROGRAM.CUBE_SH].program = cubeMapSHProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.CUBE_SH);
         {
+            /*
+            this.envMapSHTexture = gl.createTexture();
+            gl.bindTexture( gl.TEXTURE_2D, this.envMapSHTexture );
+            gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST );
+            gl.texParameteri( gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST );
+            gl.texImage2D( gl.TEXTURE_2D, 0, gl.RGBA, 8, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null );
+      
+            let sb = gl.createRenderbuffer();
+            gl.bindRenderbuffer( gl.RENDERBUFFER, sb );
+            gl.renderbufferStorage( gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, 8, 1 );
+      
+            this.envMapSHFrameBuffer = gl.createFramebuffer();
+            gl.bindFramebuffer( gl.FRAMEBUFFER, this.envMapSHFrameBuffer );
+            gl.framebufferTexture2D( gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.envMapSHTexture, 0 );
+            gl.framebufferRenderbuffer( gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, sb );
+            */
         }
-        this.vertexBuffer = gl.createBuffer();
-        this.vertexNormalBuffer = gl.createBuffer();
-        this.vertexColorBuffer = gl.createBuffer();
-        this.vertexTexCoordBuffer = gl.createBuffer();
-        this.indexBuffer = gl.createBuffer();
-        this.dirty = true;
     }
     Renderer.prototype.cacheLitShaderProgramLocations = function (sp) {
         var gl = this.context;
@@ -3857,10 +3994,16 @@ var Renderer = (function () {
         uniforms.uInverseView = gl.getUniformLocation(program, "uInverseViewMatrix");
         uniforms.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
         uniforms.uEnvMap = gl.getUniformLocation(program, "environment");
+        uniforms.uVolume = gl.getUniformLocation(program, "volume");
         uniforms.uProcSky = gl.getUniformLocation(program, "proceduralSky");
         uniforms.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
         uniforms.uEnvironmentMipMaps = gl.getUniformLocation(program, "environmentMipMaps");
         uniforms.uTime = gl.getUniformLocation(program, "uTime");
+        uniforms.uCloudiness = gl.getUniformLocation(program, "uCloudiness");
+        uniforms.uCloudSpeed = gl.getUniformLocation(program, "uCloudSpeed");
+        uniforms.uNoiseLayer = gl.getUniformLocation(program, "uNoiseLayer");
+        uniforms.uPerlinNoise = gl.getUniformLocation(program, "uPerlinNoise");
+        uniforms.uWorleyNoise = gl.getUniformLocation(program, "uWorleyNoise");
         uniforms.uMaterial = new ShaderMaterialProperties();
         uniforms.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
         uniforms.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
@@ -3879,20 +4022,21 @@ var Renderer = (function () {
             uniforms.uLights[i].radius = gl.getUniformLocation(program, "lights[" + i + "].radius");
         }
     };
-    Renderer.prototype.compileShaderProgram = function (vs, fs) {
+    Renderer.prototype.compileShaderProgram = function (vs, fs, suppressErrors) {
+        if (suppressErrors === void 0) { suppressErrors = false; }
         var gl = this.context;
         if (gl) {
             var vertexShader = gl.createShader(gl.VERTEX_SHADER);
             gl.shaderSource(vertexShader, vs);
             gl.compileShader(vertexShader);
-            if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+            if (!suppressErrors && !gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
                 console.log("An error occurred compiling the vertex shader: " + gl.getShaderInfoLog(vertexShader));
                 return null;
             }
             var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
             gl.shaderSource(fragmentShader, fs);
             gl.compileShader(fragmentShader);
-            if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+            if (!suppressErrors && !gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
                 console.log("An error occurred compiling the fragment shader: " + gl.getShaderInfoLog(fragmentShader));
                 return null;
             }
@@ -3904,31 +4048,31 @@ var Renderer = (function () {
             // gl.bindAttribLocation( program, 0, "aVertexPosition" );
             gl.linkProgram(program);
             if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                console.log("Unable to initialize the shader program." + gl.getProgramInfoLog(program));
+                console.log("Unable to initialize the shader program: " + gl.getProgramInfoLog(program));
+                console.log("Problematic vertex shader:\n" + vs);
+                console.log("Problematic fragment shader:\n" + fs);
             }
             return program;
         }
         return null;
     };
     Renderer.prototype.update = function () {
-        var _this = this;
+        var gl = this.context;
         var scene = Scene.getActiveScene();
         if (scene) {
             scene.renderables.forEach(function (p) {
                 if (p.renderData.dirty) {
-                    p.rebuildRenderData();
-                    _this.dirty = true;
+                    p.rebuildRenderData(gl);
                 }
             });
         }
     };
-    Renderer.prototype.renderSceneEnvironment = function (gl, scene, mvStack, viewportW, viewportH, perspective, renderToCubeMap) {
+    Renderer.prototype.renderSceneEnvironment = function (gl, scene, mvStack, viewportW, viewportH, perspective) {
         if (perspective === void 0) { perspective = null; }
-        if (renderToCubeMap === void 0) { renderToCubeMap = false; }
         if (perspective == null) {
             perspective = gml.makePerspective(gml.fromDegrees(45), viewportW / viewportH, 0.1, 100.0);
         }
-        if (scene.environmentMap != null && !renderToCubeMap) {
+        if (scene.environmentMap != null) {
             this.useProgram(gl, SHADER_PROGRAM.SKYBOX);
         }
         else {
@@ -3936,7 +4080,7 @@ var Renderer = (function () {
         }
         var shaderVariables = this.programData[this.currentProgram].uniforms;
         var fullscreen = new Quad();
-        fullscreen.rebuildRenderData();
+        fullscreen.rebuildRenderData(gl);
         var inverseProjectionMatrix = perspective.invert();
         gl.uniformMatrix4fv(shaderVariables.uInverseProjection, false, inverseProjectionMatrix.m);
         var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
@@ -3945,12 +4089,9 @@ var Renderer = (function () {
             gl.uniform4fv(shaderVariables.uCameraPos, this.camera.matrix.translation.negate().v);
         }
         gl.uniform1f(shaderVariables.uTime, scene.time);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.vertices, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
         if (this.currentProgram == SHADER_PROGRAM.SKYBOX) {
             gl.uniform1i(shaderVariables.uEnvMap, 0);
             gl.activeTexture(gl.TEXTURE0);
@@ -4011,6 +4152,22 @@ var Renderer = (function () {
                     gl.uniform1f(shaderVariables_6.uTime, scene.time);
                 }
             }
+            else if (p.material instanceof NoiseMaterial) {
+                _this.useProgram(gl, SHADER_PROGRAM.NOISE_WRITER);
+                var shaderVariables_7 = _this.programData[_this.currentProgram].uniforms;
+                gl.uniform1f(shaderVariables_7.uNoiseLayer, p.material.layer);
+            }
+            else if (p.material instanceof VolumeMaterial) {
+                var mat = p.material;
+                _this.useProgram(gl, SHADER_PROGRAM.VOLUME_VIEWER);
+                var shaderVariables_8 = _this.programData[_this.currentProgram].uniforms;
+                gl.uniform1f(shaderVariables_8.uNoiseLayer, mat.layer);
+                if (mat.volumeTexture != null) {
+                    gl.uniform1i(shaderVariables_8.uVolume, 0);
+                    gl.activeTexture(gl.TEXTURE0);
+                    gl.bindTexture(gl.TEXTURE_3D, mat.volumeTexture);
+                }
+            }
             var shaderVariables = _this.programData[_this.currentProgram].uniforms;
             scene.lights.forEach(function (l, i) {
                 var lightpos = mvStack[mvStack.length - 1].transform(l.position);
@@ -4034,17 +4191,17 @@ var Renderer = (function () {
             gl.uniformMatrix3fv(shaderVariables.uNormalWorld, false, normalWorldMatrix.m);
             var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
             gl.uniformMatrix3fv(shaderVariables.uInverseView, false, inverseViewMatrix.m);
-            gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, p.renderData.vertices, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.vertexBuffer);
             gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, _this.indexBuffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, p.renderData.indices, gl.STATIC_DRAW);
-            gl.bindBuffer(gl.ARRAY_BUFFER, _this.vertexNormalBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, p.renderData.normals, gl.STATIC_DRAW);
-            if (shaderVariables.aVertexNormal != -1) {
-                // look into why this is -1!!!!!!!!
+            if (shaderVariables.aVertexTexCoord >= 0) {
+                gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.vertexTexCoordBuffer);
+                gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.vertexNormalBuffer);
+            if (shaderVariables.aVertexNormal >= 0) {
                 gl.vertexAttribPointer(shaderVariables.aVertexNormal, 3, gl.FLOAT, false, 0, 0);
             }
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, p.renderData.indexBuffer);
             if (scene.environmentMap != null) {
                 gl.uniform1i(shaderVariables.uEnvMap, 0); // tells shader to refer to texture slot 1 for the uEnvMap uniform
                 gl.activeTexture(gl.TEXTURE0);
@@ -4078,19 +4235,16 @@ var Renderer = (function () {
     Renderer.prototype.renderIrradianceFromScene = function (gl, scene, pass) {
         this.useProgram(gl, SHADER_PROGRAM.CUBE_SH);
         var fullscreen = new Quad();
-        fullscreen.rebuildRenderData();
+        fullscreen.rebuildRenderData(gl);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
         gl.uniformMatrix4fv(shaderVariables.uModelView, false, gml.Mat4.identity().m);
         gl.uniformMatrix3fv(shaderVariables.uNormalModelView, false, gml.Mat3.identity().m);
         gl.uniformMatrix4fv(shaderVariables.uPerspective, false, gml.Mat4.identity().m);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.vertices, gl.STATIC_DRAW);
-        gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTexCoordBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.textureCoords, gl.STATIC_DRAW);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
         if (scene.environmentMap != null) {
             gl.uniform1i(shaderVariables.uEnvMap, 0); // tells GL to look at texture slot 0
             gl.activeTexture(gl.TEXTURE0);
@@ -4101,16 +4255,14 @@ var Renderer = (function () {
     Renderer.prototype.renderFullScreenTexture = function (gl, texture) {
         // this.useProgram( gl, SHADER_PROGRAM.UNLIT );
         var fullscreen = new Quad();
-        fullscreen.rebuildRenderData();
+        fullscreen.rebuildRenderData(gl);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.vertices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTexCoordBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.textureCoords, gl.STATIC_DRAW);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indices, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
         gl.uniform1i(shaderVariables.uMaterial.colorMap, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -4144,125 +4296,59 @@ var Renderer = (function () {
     Renderer.prototype.render = function () {
         var gl = this.context;
         if (gl) {
-            if (this.dirty) {
+            //
+            // DRAW
+            var scene = Scene.getActiveScene();
+            if (scene) {
                 //
-                // DRAW
-                var scene = Scene.getActiveScene();
-                if (scene) {
-                    //
-                    // SET UP ENVIRONMENT MAP
-                    var cubeMapTexture = null;
-                    if (scene.environmentMap != null && scene.environmentMap.loaded && scene.environmentMap.cubeMapTexture == null) {
+                // SET UP ENVIRONMENT MAP
+                var cubeMapTexture = null;
+                if (scene.environmentMap != null && scene.environmentMap.loaded && scene.environmentMap.cubeMapTexture == null) {
+                }
+                // 
+                // GENERATE ENVIRONMENT MAP, IF NECESSARY
+                if (scene.hasEnvironment && scene.dynamicEnvironment) {
+                    if (scene.dynamicEnvironment) {
+                        // render using specified shader
+                        // TODO: actually pass in shader into scene
+                        scene.generateEnvironmentMapFromShader(this, gl, this.programData[SHADER_PROGRAM.SKY].program, this.programData[SHADER_PROGRAM.SKY].uniforms);
+                    }
+                    else if (scene.environmentMap.loaded && scene.environmentMap.cubeMapTexture == null) {
+                        // generate static cube map from face images - we only do this once
                         scene.environmentMap.generateCubeMapFromSources(gl);
                     }
-                    // 
-                    // GENERATE ENVIRONMENT MAP, IF NECESSARY
-                    if (scene.environmentMap == null || scene.environmentMap.dynamic) {
-                        var renderTargetFramebuffer = gl.createFramebuffer();
-                        gl.bindFramebuffer(gl.FRAMEBUFFER, renderTargetFramebuffer);
-                        var size = 256; // this is the pixel size of each side of the cube map
-                        // 
-                        // RENDER TO TEXTURE
-                        var depthBuffer = gl.createRenderbuffer(); // renderbuffer for depth buffer in framebuffer
-                        gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer); // so we can create storage for the depthBuffer
-                        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, size, size);
-                        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
-                        // this is the texture we'll render each face of the cube map into
-                        // as we render each face of the cubemap into it, we'll bind it to the actual cubemap
-                        var cubeMapRenderTarget = null;
-                        if (scene.environmentMap == null) {
-                            cubeMapRenderTarget = gl.createTexture();
-                            gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRenderTarget);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-                            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-                            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                            gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
-                        }
-                        else {
-                            cubeMapRenderTarget = scene.environmentMap.cubeMapTexture;
-                        }
-                        // draw +x view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X, cubeMapRenderTarget, 0);
-                        gl.viewport(0, 0, size, size);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        var perspective = gml.makePerspective(gml.fromDegrees(90), 1, 0.1, 100.0);
-                        mvStack.push(new gml.Mat4(0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        // draw -x view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, cubeMapRenderTarget, 0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        mvStack.push(new gml.Mat4(0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        // draw +y view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, cubeMapRenderTarget, 0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        mvStack.push(new gml.Mat4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        // draw -y view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, cubeMapRenderTarget, 0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        mvStack.push(new gml.Mat4(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        // draw +z view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, cubeMapRenderTarget, 0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        mvStack.push(new gml.Mat4(1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        // draw -z view
-                        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, cubeMapRenderTarget, 0);
-                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                        var mvStack = [];
-                        mvStack.push(new gml.Mat4(-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1));
-                        this.renderSceneEnvironment(gl, scene, mvStack, size, size, perspective, true);
-                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRenderTarget);
-                        gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-                        scene.environmentMap = new CubeMap(cubeMapRenderTarget);
-                        scene.environmentMap.dynamic = true;
-                        gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
-                    }
-                    //
-                    // SET UP IRRADIANCE MAP
-                    var irradianceTexture = null;
-                    if (scene.irradianceMap != null && scene.irradianceMap.loaded && scene.irradianceMap.cubeMapTexture == null) {
-                        scene.irradianceMap.generateCubeMapFromSources(gl);
-                    }
-                    var mvStack = [];
-                    if (this.camera != null) {
-                        mvStack.push(this.camera.matrix);
-                    }
-                    else {
-                        mvStack.push(gml.Mat4.identity());
-                    }
-                    // 
-                    // RENDER TO SCREEN
-                    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                    gl.viewport(0, 0, this.viewportW, this.viewportH);
-                    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                    // draw environment map
-                    this.renderSceneEnvironment(gl, scene, mvStack, this.viewportW, this.viewportH);
-                    // draw scene
-                    gl.clear(gl.DEPTH_BUFFER_BIT);
-                    this.renderScene(gl, scene, mvStack, PASS.STANDARD_FORWARD);
                 }
-                this.dirty = false;
+                //
+                // SET UP IRRADIANCE MAP
+                // TODO implement
+                var irradianceTexture = null;
+                if (scene.irradianceMap != null && scene.irradianceMap.loaded && scene.irradianceMap.cubeMapTexture == null) {
+                    scene.irradianceMap.generateCubeMapFromSources(gl);
+                }
+                var mvStack = [];
+                if (this.camera != null) {
+                    mvStack.push(this.camera.matrix);
+                }
+                else {
+                    mvStack.push(gml.Mat4.identity());
+                }
+                // 
+                // RENDER TO SCREEN
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0, 0, this.viewportW, this.viewportH);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                // draw environment map
+                if (scene.hasEnvironment) {
+                    this.renderSceneEnvironment(gl, scene, mvStack, this.viewportW, this.viewportH);
+                }
+                // draw scene
+                gl.clear(gl.DEPTH_BUFFER_BIT);
+                this.renderScene(gl, scene, mvStack, PASS.STANDARD_FORWARD);
             }
         }
     };
     Renderer.prototype.setCamera = function (camera) {
         this.camera = camera;
-        this.dirty = true;
     };
     return Renderer;
 }());
@@ -4270,7 +4356,7 @@ var Renderer = (function () {
 //
 // light.ts
 // user editable light base interface
-var Light = (function () {
+var Light = /** @class */ (function () {
     function Light() {
         this.position = new gml.Vec4(0, 0, 0, 1);
         this.enabled = true;
@@ -4279,14 +4365,15 @@ var Light = (function () {
     }
     return Light;
 }());
-var PointLight = (function (_super) {
+var PointLight = /** @class */ (function (_super) {
     __extends(PointLight, _super);
     function PointLight(position, color, radius) {
         if (radius === void 0) { radius = 1; }
-        _super.call(this);
-        this.position = position;
-        this.color = color;
-        this.radius = radius;
+        var _this = _super.call(this) || this;
+        _this.position = position;
+        _this.color = color;
+        _this.radius = radius;
+        return _this;
     }
     return PointLight;
 }(Light));
@@ -4302,16 +4389,19 @@ var CUBEMAPTYPE;
 ;
 // the cube map should be responsible for constructing from source
 // or being injected one via cubeMapTexture (rendered externally)
-var CubeMap = (function () {
+var CubeMap = /** @class */ (function () {
     function CubeMap() {
         var args = [];
         for (var _i = 0; _i < arguments.length; _i++) {
-            args[_i - 0] = arguments[_i];
+            args[_i] = arguments[_i];
         }
-        if (args.length == 1) {
+        if (args.length == 2) {
             this.cubeMapTexture = args[0];
+            this.dynamic = args[1];
+            // we're generating a cube map from a shader, at constructor time
+            // This should just take in a cubeMapTexture
         }
-        else if (args.length == 7) {
+        else if (args.length == 8) {
             // we're generating a cube map from an array of 6 images
             var px = args[0];
             var nx = args[1];
@@ -4320,6 +4410,7 @@ var CubeMap = (function () {
             var pz = args[4];
             var nz = args[5];
             var finishedLoading = args[6];
+            var dynamic = args[7];
             this.faces = [];
             this.facesLoaded = 0;
             this.cubeMapTexture = null;
@@ -4334,11 +4425,9 @@ var CubeMap = (function () {
             this.asyncLoadFace(ny, CUBEMAPTYPE.NEG_Y, finishedLoading);
             this.asyncLoadFace(pz, CUBEMAPTYPE.POS_Z, finishedLoading);
             this.asyncLoadFace(nz, CUBEMAPTYPE.NEG_Z, finishedLoading);
+            this.dynamic = dynamic;
         }
-        this.dynamic = false;
     }
-    CubeMap.prototype.generateCubeMapFromShader = function (gl) {
-    };
     CubeMap.prototype.generateCubeMapFromSources = function (gl) {
         this.cubeMapTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.cubeMapTexture);
@@ -4379,19 +4468,132 @@ var CubeMap = (function () {
     });
     return CubeMap;
 }());
-var Scene = (function () {
-    function Scene(environmentMap, irradianceMap) {
+var Scene = /** @class */ (function () {
+    function Scene(environmentMap, irradianceMap, hasEnvironment, dynamicEnvironment, noiseVolumes) {
+        if (hasEnvironment === void 0) { hasEnvironment = false; }
+        if (dynamicEnvironment === void 0) { dynamicEnvironment = false; }
+        if (noiseVolumes === void 0) { noiseVolumes = []; }
         this.renderables = [];
         this.lights = [];
         this.environmentMap = environmentMap;
         this.irradianceMap = irradianceMap;
         this.time = 0;
+        this.hasEnvironment = hasEnvironment;
+        this.dynamicEnvironment = dynamicEnvironment;
+        this.noiseVolumes = noiseVolumes;
+        this.cloudiness = 0.5;
+        this.cloudSpeed = 3;
     }
     Scene.prototype.addRenderable = function (renderable) {
         this.renderables.push(renderable);
     };
     Scene.prototype.addLight = function (light) {
         this.lights.push(light);
+    };
+    Scene.prototype.generateEnvironmentMapFromShader = function (renderer, gl, shader, variables) {
+        var renderTargetFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, renderTargetFramebuffer);
+        var size = 256; // this is the pixel size of each side of the cube map
+        // 
+        // RENDER TO TEXTURE
+        var depthBuffer = gl.createRenderbuffer(); // renderbuffer for depth buffer in framebuffer
+        gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer); // so we can create storage for the depthBuffer
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, size, size);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+        // this is the texture we'll render each face of the cube map into
+        // as we render each face of the cubemap into it, we'll bind it to the actual cubemap
+        var cubeMapRenderTarget = null;
+        if (this.environmentMap == null || this.environmentMap.cubeMapTexture == null) {
+            cubeMapRenderTarget = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRenderTarget);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_X, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Y, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_Z, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texImage2D(gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, 0, gl.RGB, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+        }
+        else {
+            cubeMapRenderTarget = this.environmentMap.cubeMapTexture;
+        }
+        var cameraPos = gml.Vec4.origin;
+        // draw +x view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_X, cubeMapRenderTarget, 0);
+        gl.viewport(0, 0, size, size);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var perspective = gml.makePerspective(gml.fromDegrees(90), 1, 0.1, 100.0);
+        var rightView = new gml.Mat4(0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, rightView, size, size, perspective, cameraPos);
+        // draw -x view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_X, cubeMapRenderTarget, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var leftView = new gml.Mat4(0, 0, 1, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, leftView, size, size, perspective, cameraPos);
+        // draw +y view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_Y, cubeMapRenderTarget, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var upView = new gml.Mat4(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, upView, size, size, perspective, cameraPos);
+        // draw -y view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, cubeMapRenderTarget, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var downView = new gml.Mat4(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, downView, size, size, perspective, cameraPos);
+        // draw +z view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, cubeMapRenderTarget, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var frontView = new gml.Mat4(1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, frontView, size, size, perspective, cameraPos);
+        // draw -z view
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, cubeMapRenderTarget, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        var backView = new gml.Mat4(-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+        this.renderFace(renderer, gl, shader, variables, cubeMapRenderTarget, backView, size, size, perspective, cameraPos);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRenderTarget);
+        gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+        if (this.environmentMap == null) {
+            this.environmentMap = new CubeMap(cubeMapRenderTarget, true);
+        }
+        else {
+            this.environmentMap.cubeMapTexture = cubeMapRenderTarget;
+            this.environmentMap.dynamic = true;
+        }
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+    };
+    Scene.prototype.renderFace = function (renderer, gl, shader, variables, cubeMapRT, modelView, viewportW, viewportH, perspective, cameraPos) {
+        renderer.useProgram(gl, SHADER_PROGRAM.SKY);
+        if (this.fullscreen == null) {
+            this.fullscreen = new Quad();
+            this.fullscreen.rebuildRenderData(gl);
+        }
+        var inverseProjectionMatrix = perspective.invert();
+        gl.uniformMatrix4fv(variables.uInverseProjection, false, inverseProjectionMatrix.m);
+        var inverseViewMatrix = modelView.invert().mat3;
+        gl.uniformMatrix3fv(variables.uInverseView, false, inverseViewMatrix.m);
+        gl.uniform4fv(variables.uCameraPos, cameraPos.v);
+        gl.uniform1f(variables.uTime, this.time);
+        gl.uniform1f(variables.uCloudiness, this.cloudiness);
+        gl.uniform1f(variables.uCloudSpeed, this.cloudSpeed);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreen.renderData.vertexBuffer);
+        gl.vertexAttribPointer(variables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.fullscreen.renderData.indexBuffer);
+        gl.uniform1i(variables.uEnvMap, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRT);
+        if (this.noiseVolumes.length > 0) {
+            gl.uniform1i(variables.uPerlinNoise, 1);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_3D, this.noiseVolumes[0]);
+            gl.uniform1i(variables.uWorleyNoise, 2);
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_3D, this.noiseVolumes[1]);
+        }
+        gl.drawElements(gl.TRIANGLES, this.fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Scene.setActiveScene = function (scene) {
         this.activeScene = scene;
@@ -4401,12 +4603,179 @@ var Scene = (function () {
     };
     return Scene;
 }());
-var shaderRepo = null; // global for debugging
-var skyScene;
-var SkyApp = (function () {
+var verbose_editor_logging = false;
+var ShaderEditor = /** @class */ (function () {
+    function ShaderEditor(renderer) {
+        this.renderer = renderer;
+        // shader list selector
+        this.shaderList = document.createElement("ul");
+        this.shaderList.setAttribute("class", "shader-list");
+        this.selectedShader = null;
+        // vert/frag shader textbox
+        this.vertexEditorField = document.createElement("div");
+        this.vertexEditorField.setAttribute("class", "shader-text");
+        this.fragmentEditorField = document.createElement("div");
+        this.fragmentEditorField.setAttribute("class", "shader-text");
+        this.shaderEditor = document.createElement("div");
+        this.shaderEditor.setAttribute("class", "shader-text-con");
+        this.shaderEditor.appendChild(this.vertexEditorField);
+        this.shaderEditor.appendChild(this.fragmentEditorField);
+        this.vertexShaderEditor = ace.edit(this.vertexEditorField);
+        this.vertexShaderEditor.setTheme("ace/theme/solarized_light");
+        this.vertexShaderEditor.session.setMode("ace/mode/glsl");
+        this.vertexShaderEditor.$blockScrolling = Infinity;
+        this.fragmentShaderEditor = ace.edit(this.fragmentEditorField);
+        this.fragmentShaderEditor.setTheme("ace/theme/solarized_light");
+        this.fragmentShaderEditor.session.setMode("ace/mode/glsl");
+        this.fragmentShaderEditor.$blockScrolling = Infinity;
+        // create stylesheet dynamically
+        // this should probably just be put in a CSS file somewhere so it's overrideable
+        // but for now, since we really don't care about customizability of the editor, just
+        // put it all here for portability and ease of building
+        var stylesheet = document.styleSheets[0];
+        if (stylesheet == null) {
+            var style = document.createElement("style");
+            style.type = "text/css";
+            document.getElementsByTagName("head")[0].appendChild(style);
+            stylesheet = document.styleSheets[0];
+        }
+        stylesheet.insertRule("html, body       { height: 100%; margin: 0; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; }");
+        stylesheet.insertRule(".shader-list     { float:left; list-style-type:none; margin:0; padding-left:0; width: 200px; }");
+        stylesheet.insertRule(".shader-entry    { border-bottom: 1px #ccc solid; font-size: 70%; padding-left: 10%; padding-top: 3%; padding-bottom: 3%; cursor: default; }");
+        stylesheet.insertRule(".selected        { background-color: #0079e8; color: #fff }");
+        stylesheet.insertRule(".shader-text     { border-left: 1px #ccc solid; width: 50%; height: 100%; margin: 0; padding: 0; }");
+        stylesheet.insertRule(".shader-text-con { float: left; flex-grow: 1; display: flex; }");
+    }
+    ShaderEditor.prototype.rebuildSelectedShader = function (session) {
+        console.assert(session == this.vertexShaderEditor.session || session == this.fragmentShaderEditor.assertion);
+        var gl = this.renderer.context;
+        if (gl) {
+            var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, this.vertexShaderEditor.getValue());
+            gl.compileShader(vertexShader);
+            if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                var errors = gl.getShaderInfoLog(vertexShader).split("\n");
+                var annotations = [];
+                for (var i = 0; i < errors.length; i++) {
+                    var error = errors[i];
+                    var results = /\w+: [0-9]+:([0-9]+): (.*)$/g.exec(error); // group 1: line number, group 2: error message
+                    if (results == null)
+                        continue;
+                    // see https://regexr.com/3k19s
+                    annotations.push({ row: parseInt(results[1]) - 1, column: 0, text: results[2], type: "error" });
+                }
+                this.vertexShaderEditor.session.clearAnnotations();
+                this.vertexShaderEditor.session.setAnnotations(annotations);
+                if (verbose_editor_logging) {
+                    console.log(errors);
+                }
+                return;
+            }
+            else {
+                // all good.
+                this.vertexShaderEditor.session.clearAnnotations();
+            }
+            var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, this.fragmentShaderEditor.getValue());
+            gl.compileShader(fragmentShader);
+            if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+                var errors = gl.getShaderInfoLog(fragmentShader).split("\n");
+                var annotations = [];
+                for (var i = 0; i < errors.length; i++) {
+                    var error = errors[i];
+                    var results = /\w+: [0-9]+:([0-9]+): (.*)$/g.exec(error); // group 1: line number, group 2: error message
+                    if (results == null)
+                        continue;
+                    // see https://regexr.com/3k19s
+                    annotations.push({ row: parseInt(results[1]) - 1, column: 0, text: results[2], type: "error" });
+                }
+                this.fragmentShaderEditor.session.clearAnnotations();
+                this.fragmentShaderEditor.session.setAnnotations(annotations);
+                if (verbose_editor_logging) {
+                    console.log(errors);
+                }
+                return;
+            }
+            else {
+                // all good.
+                this.fragmentShaderEditor.session.clearAnnotations();
+            }
+            var program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            // force aVertexPosition to be bound to 0 to avoid perf penalty
+            // gl.bindAttribLocation( program, 0, "aVertexPosition" );
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.log("Unable to initialize the shader program: " + gl.getProgramInfoLog(program));
+                return;
+            }
+            this.renderer.programData[this.selectedShaderIndex].program = program;
+            this.renderer.cacheLitShaderProgramLocations(this.selectedShaderIndex);
+        }
+        else {
+            console.log("no renderer context! This is bad.");
+        }
+    };
+    ShaderEditor.prototype.install = function () {
+        var _this = this;
+        var container = document.getElementById("shader-editor");
+        this.selectedShaderIndex = 0;
+        this.vertexShaderEditor.setValue(this.renderer.programData[0].vert, -1);
+        this.fragmentShaderEditor.setValue(this.renderer.programData[0].frag, -1);
+        this.vertexEditSessions = [];
+        this.fragmentEditSessions = [];
+        var _loop_1 = function () {
+            if (isNaN(programName)) {
+                var index_1 = parseInt(SHADER_PROGRAM[programName]);
+                var vertexSession_1 = ace.createEditSession(this_1.renderer.programData[index_1].vert, "ace/mode/glsl");
+                vertexSession_1.on("change", function (e) {
+                    _this.rebuildSelectedShader(vertexSession_1);
+                });
+                this_1.vertexEditSessions.push(vertexSession_1);
+                var fragSession_1 = ace.createEditSession(this_1.renderer.programData[index_1].frag, "ace/mode/glsl");
+                fragSession_1.on("change", function (e) {
+                    _this.rebuildSelectedShader(fragSession_1);
+                });
+                this_1.fragmentEditSessions.push(fragSession_1);
+                var li_1 = document.createElement("li");
+                li_1.innerText = this_1.prettifyEnum(programName);
+                li_1.setAttribute("class", "shader-entry");
+                this_1.shaderList.appendChild(li_1);
+                li_1.onclick = function () {
+                    if (_this.selectedShader != li_1) {
+                        _this.selectedShaderIndex = index_1;
+                        _this.vertexShaderEditor.setSession(vertexSession_1);
+                        _this.fragmentShaderEditor.setSession(fragSession_1);
+                        _this.selectedShader.setAttribute("class", "shader-entry"); // deselect
+                        _this.selectedShader = li_1;
+                        li_1.setAttribute("class", "selected shader-entry");
+                    }
+                };
+            }
+        };
+        var this_1 = this;
+        for (var programName in SHADER_PROGRAM) {
+            _loop_1();
+        }
+        this.selectedShader = this.shaderList.firstElementChild;
+        this.selectedShader.setAttribute("class", "selected shader-entry");
+        container.appendChild(this.shaderList);
+        container.appendChild(this.shaderEditor);
+    };
+    ShaderEditor.prototype.prettifyEnum = function (input) {
+        var output = input.replace("_", " ");
+        output = output.toLowerCase();
+        output = output.replace(/\b\w/g, function (l) { return l.toUpperCase(); });
+        return output;
+    };
+    return ShaderEditor;
+}());
+var SkyApp = /** @class */ (function () {
     function SkyApp(params, shaderRepo) {
         var _this = this;
         this.renderer = new Renderer(params.vp, shaderRepo);
+        this.editor = new ShaderEditor(this.renderer);
         this.orbitCenter = params.orbitCenter;
         this.orbitDistance = params.orbitDistance;
         this.yaw = gml.fromDegrees(140);
@@ -4415,19 +4784,29 @@ var SkyApp = (function () {
         this.dirty = true;
         this.dragStart = new gml.Vec2(0, 0);
         this.lastMousePos = new gml.Vec2(0, 0);
-        setInterval(function () { _this.fixedUpdate(1.0 / 30); }, 1000 / 30);
+        var options = document.getElementsByTagName("select");
+        var frameLimiterOption = null;
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].id == 'frame-limiter')
+                frameLimiterOption = options[i];
+        }
+        frameLimiterOption.onchange = changeFrameLimit;
+        var cloudinessSlider = document.getElementById("cloud-slider");
+        var cloudSpeedSlider = document.getElementById("wind-slider");
+        cloudinessSlider.oninput = changeCloudiness;
+        cloudSpeedSlider.oninput = changeCloudSpeed;
         params.vp.addEventListener('mousedown', function (ev) {
             switch (ev.button) {
-                case 0:
+                case 0:// left
                     _this.dragStart.x = ev.clientX;
                     _this.dragStart.y = ev.clientY;
                     _this.lastMousePos.x = ev.clientX;
                     _this.lastMousePos.y = ev.clientY;
                     _this.dragging = true;
                     break;
-                case 1:
+                case 1:// middle
                     break;
-                case 2:
+                case 2:// right
                     break;
             }
             ev.preventDefault();
@@ -4458,29 +4837,67 @@ var SkyApp = (function () {
             }
         }, false);
     }
-    SkyApp.prototype.fixedUpdate = function (delta) {
-        skyScene.time += 1.0 / 30.0;
-        if (this.dirty) {
-            // rebuild camera
-            var baseAim = new gml.Vec4(0, 0, -1, 0);
-            var rotY = gml.Mat4.rotateY(this.yaw);
-            var rotRight = rotY.transform(gml.Vec4.right);
-            var rotX = gml.Mat4.rotate(rotRight, this.pitch);
-            var rotAim = rotX.transform(rotY.transform(baseAim)).normalized;
-            var rotUp = rotRight.cross(rotAim);
-            var rotPos = this.orbitCenter.add(rotAim.negate().multiply(this.orbitDistance));
-            this.camera = new Camera(rotPos, rotAim, rotUp, rotRight);
-            this.renderer.setCamera(this.camera);
-            this.renderer.update();
-            this.dirty = false;
-        }
-        // this is way too slow
-        this.renderer.dirty = true;
-        this.renderer.render();
-    };
     return SkyApp;
 }());
+var frameLimit = -1;
+function changeCloudiness(e) {
+    scene.cloudiness = e.target.value / 100;
+}
+function changeCloudSpeed(e) {
+    scene.cloudSpeed = e.target.value / 2; // 1 to 50
+}
+function changeFrameLimit(e) {
+    switch (e.target.value) {
+        case "adaptive":
+            frameLimit = -1;
+            break;
+        case "60":
+            frameLimit = 60;
+            break;
+        case "120":
+            frameLimit = 120;
+            break;
+        case "144":
+            frameLimit = 144;
+            break;
+        case "custom":
+            frameLimit = 240; // Haahaa
+            break;
+    }
+}
 var app = null;
+var scene = null;
+var lastFrame = null;
+var finishedDownloadingTexture = false;
+function updateAndDraw(t) {
+    var dt = (t - lastFrame) / 1000.0;
+    if (frameLimit != -1 && dt < 1.0 / frameLimit) {
+        window.requestAnimationFrame(updateAndDraw);
+        return;
+    }
+    lastFrame = t;
+    scene.time += dt;
+    if (app.dirty) {
+        // rebuild camera
+        var baseAim = new gml.Vec4(0, 0, -1, 0);
+        var rotY = gml.Mat4.rotateY(app.yaw);
+        var rotRight = rotY.transform(gml.Vec4.right);
+        var rotX = gml.Mat4.rotate(rotRight, app.pitch);
+        var rotAim = rotX.transform(rotY.transform(baseAim)).normalized;
+        var rotUp = rotRight.cross(rotAim);
+        var rotPos = app.orbitCenter.add(rotAim.negate().multiply(app.orbitDistance));
+        app.camera = new Camera(rotPos, rotAim, rotUp, rotRight);
+        app.renderer.setCamera(app.camera);
+        app.renderer.update();
+        app.dirty = false;
+    }
+    // this is way too slow
+    if (finishedDownloadingTexture) {
+        app.renderer.dirty = true;
+        app.renderer.render();
+    }
+    window.requestAnimationFrame(updateAndDraw);
+}
 function StartSky() {
     if (app == null) {
         var params = {
@@ -4488,11 +4905,456 @@ function StartSky() {
             orbitCenter: new gml.Vec4(0, 5, 0, 1),
             orbitDistance: 0.001
         };
-        shaderRepo = new ShaderRepository(function (repo) { app = new SkyApp(params, repo); });
-        skyScene = new Scene(null, null);
-        Scene.setActiveScene(skyScene);
-        // ocean
-        skyScene.addRenderable(new InfinitePlane(16, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+        var shaderRepo = new ShaderRepository(function (repo) {
+            app = new SkyApp(params, repo);
+            var gl = app.renderer.context;
+            app.editor.install();
+            var noise = new Noise();
+            scene = new Scene(null, null, true, true, [noise.perlin3Texture(gl, 128), noise.textureFromOfflinePackedData(gl, "worley.blob", 64, function (texture) {
+                    finishedDownloadingTexture = true;
+                    scene.noiseVolumes[1] = texture;
+                })]);
+            Scene.setActiveScene(scene);
+            // ocean
+            scene.addRenderable(new InfinitePlane(12, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+            lastFrame = performance.now();
+            var cloudinessSlider = document.getElementById("cloud-slider");
+            var cloudSpeedSlider = document.getElementById("wind-slider");
+            cloudinessSlider.value = (scene.cloudiness * 100).toString();
+            cloudSpeedSlider.value = (scene.cloudSpeed * 2).toString();
+            window.requestAnimationFrame(updateAndDraw);
+            // screenspace ocean
+            /*
+            scene.addRenderable( new Quad( 1
+                                             , new gml.Vec4( 0, 30, 0, 1 )
+                                             , null
+                                             , new WaterMaterial( new gml.Vec4( 1.0, 1.0, 1.0, 1 )
+                                                                , new gml.Vec4( 1.0, 1.0, 1.0, 1 )
+                                                                , new gml.Vec4( 1.0, 1.0, 1.0, 1 )
+                                                                , new gml.Vec4( 1.0, 1.0, 1.0, 1 )
+                                                                , 1.53
+                                                                , true ) ) );
+             */
+        });
     }
 }
+// Implementation heavily based on josephg's noisejs, which is based on Stefan Gustavson's implementation.
+// Source:
+//  https://github.com/josephg/noisejs/blob/master/perlin.js
+var Noise = /** @class */ (function () {
+    function Noise() {
+        this.worleySeed = 0;
+        this.grad3 = [new gml.Vec3(1, 1, 0), new gml.Vec3(-1, 1, 0), new gml.Vec3(1, -1, 0), new gml.Vec3(-1, -1, 0),
+            new gml.Vec3(1, 0, 1), new gml.Vec3(-1, 0, 1), new gml.Vec3(1, 0, -1), new gml.Vec3(-1, 0, -1),
+            new gml.Vec3(0, 1, 1), new gml.Vec3(0, -1, 1), new gml.Vec3(0, 1, -1), new gml.Vec3(0, -1, -1)];
+        this.p = [151, 160, 137, 91, 90, 15,
+            131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23,
+            190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33,
+            88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166,
+            77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244,
+            102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196,
+            135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123,
+            5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42,
+            223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9,
+            129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228,
+            251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107,
+            49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254,
+            138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180];
+        // "allocate" space
+        this.perm = new Array(512);
+        this.gradP = new Array(512);
+        this.seed(0);
+        this.seedWorley();
+    }
+    // josephg: This isn't a very good seeding function, but it works ok. It supports 2^16
+    // different seed values. Write something better if you need more seeds.
+    Noise.prototype.seed = function (seed) {
+        if (seed > 0 && seed < 1) {
+            // Scale the seed out
+            seed *= 65536;
+        }
+        seed = Math.floor(seed);
+        if (seed < 256) {
+            seed |= seed << 8;
+        }
+        for (var i = 0; i < 256; i++) {
+            var v;
+            if (i & 1) {
+                v = this.p[i] ^ (seed & 255);
+            }
+            else {
+                v = this.p[i] ^ ((seed >> 8) & 255);
+            }
+            this.perm[i] = this.perm[i + 256] = v;
+            this.gradP[i] = this.gradP[i + 256] = this.grad3[v % 12];
+        }
+    };
+    // doesn't take a seed because I don't have a PRNG
+    Noise.prototype.seedWorley = function () {
+        this.worleyFeaturePoints = [];
+        var numFP = 128;
+        for (var i = 0; i < numFP; i++) {
+            var featurePointX = Math.random();
+            var featurePointY = Math.random();
+            var featurePointZ = Math.random();
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY, featurePointZ));
+            // for tiling in 3D space...
+            // pretend each feature point also exists exactly one cube unit over (for each face, edge and corner)
+            // this can probably be slightly optimized (IE: can probably cut this by 33%)
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX + 1, featurePointY, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX - 1, featurePointY, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY + 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY - 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY, featurePointZ + 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY, featurePointZ - 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX + 1, featurePointY + 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX - 1, featurePointY + 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX + 1, featurePointY - 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX - 1, featurePointY - 1, featurePointZ));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY + 1, featurePointZ + 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY - 1, featurePointZ + 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY + 1, featurePointZ - 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX, featurePointY - 1, featurePointZ - 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX + 1, featurePointY, featurePointZ + 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX - 1, featurePointY, featurePointZ + 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX + 1, featurePointY, featurePointZ - 1));
+            this.worleyFeaturePoints.push(new gml.Vec3(featurePointX - 1, featurePointY, featurePointZ - 1));
+        }
+        this.worleyApproxMaxDist = 1.0 / 2.51; // 2.51 == cuberoot( 16 )
+    };
+    Noise.prototype.fade = function (t) {
+        return t * t * t * (t * (t * 6 - 15) + 10);
+    };
+    Noise.prototype.lerp = function (a, b, t) {
+        return (1 - t) * a + t * b;
+    };
+    Noise.prototype.fusionTexture = function (gl, size) {
+        var rgb = [];
+        var pt = new gml.Vec3(0, 0, 0);
+        for (var z = 0; z < size; z++) {
+            for (var y = 0; y < size; y++) {
+                for (var x = 0; x < size; x++) {
+                    pt.x = x / size;
+                    pt.y = y / size;
+                    pt.z = z / size;
+                    var perlin = this.perlin3(x * 1.001, y * 1.001, z * 1.001, size - 1);
+                    var worley = Math.max((this.worleyApproxMaxDist - this.worley3(pt)) / this.worleyApproxMaxDist, 0.0);
+                    rgb.push(perlin * 255); // R
+                    rgb.push(worley * 255); // G
+                    rgb.push(0); // unused
+                }
+            }
+        }
+        var data = new Uint8Array(rgb);
+        var noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, noiseTexture);
+        // no mips
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, size, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return noiseTexture;
+    };
+    Noise.prototype.worley3Texture = function (gl, size) {
+        var rgb = [];
+        var pt = new gml.Vec3(0, 0, 0);
+        for (var z = 0; z < size; z++) {
+            for (var y = 0; y < size; y++) {
+                for (var x = 0; x < size; x++) {
+                    pt.x = x / size;
+                    pt.y = y / size;
+                    pt.z = z / size;
+                    var n = Math.max((this.worleyApproxMaxDist - this.worley3(pt)) / this.worleyApproxMaxDist, 0.0);
+                    rgb.push(n * 255); // R
+                    rgb.push(n * 255); // G
+                    rgb.push(n * 255); // B
+                }
+            }
+        }
+        var data = new Uint8Array(rgb);
+        var noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, noiseTexture);
+        // no mips
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, size, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return noiseTexture;
+    };
+    Noise.prototype.perlin3Texture = function (gl, size) {
+        var rgb = [];
+        for (var z = 0; z < size; z++) {
+            for (var y = 0; y < size; y++) {
+                for (var x = 0; x < size; x++) {
+                    var n = this.perlin3(x * 1.001, y * 1.001, z * 1.001, size - 1);
+                    rgb.push(n * 255); // R
+                    rgb.push(n * 255); // G
+                    rgb.push(n * 255); // B
+                }
+            }
+        }
+        var data = new Uint8Array(rgb);
+        var noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, noiseTexture);
+        // no mips
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, size, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return noiseTexture;
+    };
+    Noise.prototype.perlin3 = function (x, y, z, period) {
+        if (period === void 0) { period = 255; }
+        // Find unit grid cell containing point
+        var X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
+        // Get relative xyz coordinates of point within that cell
+        x = x - X;
+        y = y - Y;
+        z = z - Z;
+        // Wrap the integer cells at specified period
+        X = X & period;
+        Y = Y & period;
+        Z = Z & period;
+        // Calculate noise contributions from each of the eight corners
+        var n000 = this.gradP[X + this.perm[Y + this.perm[Z]]].dot3(x, y, z);
+        var n001 = this.gradP[X + this.perm[Y + this.perm[Z + 1]]].dot3(x, y, z - 1);
+        var n010 = this.gradP[X + this.perm[Y + 1 + this.perm[Z]]].dot3(x, y - 1, z);
+        var n011 = this.gradP[X + this.perm[Y + 1 + this.perm[Z + 1]]].dot3(x, y - 1, z - 1);
+        var n100 = this.gradP[X + 1 + this.perm[Y + this.perm[Z]]].dot3(x - 1, y, z);
+        var n101 = this.gradP[X + 1 + this.perm[Y + this.perm[Z + 1]]].dot3(x - 1, y, z - 1);
+        var n110 = this.gradP[X + 1 + this.perm[Y + 1 + this.perm[Z]]].dot3(x - 1, y - 1, z);
+        var n111 = this.gradP[X + 1 + this.perm[Y + 1 + this.perm[Z + 1]]].dot3(x - 1, y - 1, z - 1);
+        // Compute the fade curve value for x, y, z
+        var u = this.fade(x);
+        var v = this.fade(y);
+        var w = this.fade(z);
+        // Interpolate
+        return this.lerp(this.lerp(this.lerp(n000, n100, u), this.lerp(n001, n101, u), w), this.lerp(this.lerp(n010, n110, u), this.lerp(n011, n111, u), w), v);
+    };
+    Noise.prototype.probLookup = function (value) {
+        if (value < 393325350)
+            return 1;
+        if (value < 1022645910)
+            return 2;
+        if (value < 1861739990)
+            return 3;
+        if (value < 2700834071)
+            return 4;
+        if (value < 3372109335)
+            return 5;
+        if (value < 3819626178)
+            return 6;
+        if (value < 4075350088)
+            return 7;
+        if (value < 4203212043)
+            return 8;
+        return 9;
+    };
+    Noise.prototype.lcgRandom = function (lastValue) {
+        return ((1103515245 * lastValue + 12345) % 0x100000000);
+    };
+    Noise.prototype.worley3 = function (pt, period) {
+        if (period === void 0) { period = 255; }
+        var closest = -1;
+        var closestSq = Number.MAX_VALUE;
+        for (var i = 0; i < this.worleyFeaturePoints.length; i++) {
+            var distSq = gml.Vec3.distsq(pt, this.worleyFeaturePoints[i]);
+            if (closestSq > distSq) {
+                closestSq = distSq;
+                closest = i;
+            }
+        }
+        return gml.Vec3.distance(pt, this.worleyFeaturePoints[closest]);
+        /*
+        let nearest = this.worleyFeaturePointKDTree.findNearest( pt, Number.MAX_VALUE );
+        return nearest;
+         */
+    };
+    Noise.prototype.textureFromOfflinePackedData = function (gl, path, size, loadDoneCallback) {
+        var _this = this;
+        // download blob file
+        var req = new XMLHttpRequest();
+        // onload, create texture for use
+        req.addEventListener("load", function (evt) {
+            var texture = _this.textureFromPackedData(gl, new Uint8Array(req.response), size);
+            loadDoneCallback(texture);
+        });
+        req.open("GET", path, true);
+        req.responseType = "arraybuffer";
+        req.send();
+        // create an empty 1x1x1 texture for temporary use
+        var emptyTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, emptyTexture);
+        // no mips, 1x1x1...
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, 1, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0]));
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return emptyTexture;
+    };
+    Noise.prototype.textureFromPackedData = function (gl, data, size) {
+        var unpacked = [];
+        // unpack RGB
+        for (var i = 0; i < data.length; i++) {
+            unpacked.push(data[i]);
+            unpacked.push(data[i]);
+            unpacked.push(data[i]);
+        }
+        var noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, noiseTexture);
+        // no mips
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, size, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(unpacked));
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return noiseTexture;
+    };
+    return Noise;
+}());
+var Axis;
+(function (Axis) {
+    Axis[Axis["X"] = 0] = "X";
+    Axis[Axis["Y"] = 1] = "Y";
+    Axis[Axis["Z"] = 2] = "Z";
+})(Axis || (Axis = {}));
+// 3-dimensional KD-tree to speed up nearest neighbor lookup
+// NOTE: buggy and slow for <1000 feature pts, just use linear scan
+var KDTree = /** @class */ (function () {
+    function KDTree(p, min, max, axis, first, second) {
+        this.point = p;
+        this.min = min;
+        this.max = max;
+        switch (axis) {
+            case Axis.X:
+                this.getAxisValue = KDTree.GetX;
+                this.compareFunction = KDTree.CompareX;
+                break;
+            case Axis.Y:
+                this.getAxisValue = KDTree.GetY;
+                this.compareFunction = KDTree.CompareY;
+                break;
+            case Axis.Z:
+                this.getAxisValue = KDTree.GetZ;
+                this.compareFunction = KDTree.CompareZ;
+                break;
+        }
+        this.first = first;
+        this.second = second;
+    }
+    KDTree.CompareX = function (p1, p2) {
+        return p1.x - p2.x;
+    };
+    KDTree.CompareY = function (p1, p2) {
+        return p1.y - p2.y;
+    };
+    KDTree.CompareZ = function (p1, p2) {
+        return p1.z - p2.z;
+    };
+    KDTree.GetX = function (p) {
+        return p.x;
+    };
+    KDTree.GetY = function (p) {
+        return p.y;
+    };
+    KDTree.GetZ = function (p) {
+        return p.z;
+    };
+    KDTree.prototype.findNearest = function (target, bestDist) {
+        var dist = gml.Vec3.distance(this.point, target);
+        if (dist < bestDist)
+            bestDist = dist;
+        if (this.first == null && this.second == null) {
+            return dist;
+        }
+        else {
+            if (this.compareFunction(target, this.point) < 0) {
+                var r = this.first.findNearest(target, bestDist);
+                if (r < bestDist)
+                    bestDist = r;
+                if (this.second != null && this.second.min - this.getAxisValue(target) < bestDist) {
+                    r = Math.min(r, this.second.findNearest(target, bestDist));
+                }
+                return r;
+            }
+            else if (this.second != null) {
+                var r = this.second.findNearest(target, bestDist);
+                if (r < bestDist)
+                    bestDist = r;
+                if (this.getAxisValue(target) - this.first.max < bestDist) {
+                    r = Math.min(r, this.first.findNearest(target, bestDist));
+                }
+                return r;
+            }
+        }
+    };
+    return KDTree;
+}());
+function nextAxis(axis) {
+    switch (axis) {
+        case Axis.X: return Axis.Y;
+        case Axis.Y: return Axis.Z;
+        case Axis.Z: return Axis.X;
+    }
+}
+function treeify(points, sortAxis) {
+    if (points == null || points.length == 0)
+        return null;
+    if (points.length > 1) {
+        points.sort(function (p1, p2) {
+            switch (sortAxis) {
+                case Axis.X:
+                    return p1.x - p2.x;
+                case Axis.Y:
+                    return p1.y - p2.y;
+                case Axis.Z:
+                    return p1.z - p2.z;
+            }
+        });
+    }
+    var mid = Math.floor(points.length / 2);
+    var min = 0;
+    var max = 0;
+    switch (sortAxis) {
+        case Axis.X:
+            min = points[0].x;
+            max = points[points.length - 1].x;
+            break;
+        case Axis.Y:
+            min = points[0].y;
+            max = points[points.length - 1].y;
+            break;
+        case Axis.Z:
+            min = points[0].z;
+            max = points[points.length - 1].z;
+            break;
+    }
+    return new KDTree(points[mid], min, max, sortAxis, treeify(points.slice(0, mid), nextAxis(sortAxis)), treeify(points.slice(mid + 1), nextAxis(sortAxis)));
+}
+/*
+ * License from josephg/noisejs:
+ *
+ *  ISC License
+ *
+ *  Copyright (c) 2013, Joseph Gentle
+ *
+ *  Permission to use, copy, modify, and/or distribute this software for any
+ *  purpose with or without fee is hereby granted, provided that the above
+ *  copyright notice and this permission notice appear in all copies.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+ *  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ *  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ *  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ *  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ *  OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ *  PERFORMANCE OF THIS SOFTWARE.
+ */
 //# sourceMappingURL=app.js.map
