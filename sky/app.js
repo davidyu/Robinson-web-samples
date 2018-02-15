@@ -2796,6 +2796,7 @@ var WaterMaterial = /** @class */ (function (_super) {
         _this.shininess = shininess;
         _this.screenspace = screenspace;
         _this.speed = 1.0;
+        _this.wireframe = false;
         return _this;
     }
     return WaterMaterial;
@@ -2808,12 +2809,14 @@ var RenderData = /** @class */ (function () {
         this.dirty = true;
         this.vertices = new Float32Array(0);
         this.normals = new Float32Array(0);
+        this.meshCoords = new Float32Array(0);
         this.colors = new Float32Array(0);
         this.indices = new Uint32Array(0);
         this.isTextureMapped = false;
         this.vertexBuffer = null;
         this.vertexNormalBuffer = null;
         this.vertexTexCoordBuffer = null;
+        this.meshCoordsBuffer = null;
         this.indexBuffer = null;
     }
     RenderData.prototype.rebuildBufferObjects = function (gl) {
@@ -2830,10 +2833,15 @@ var RenderData = /** @class */ (function () {
         if (this.vertexTexCoordBuffer == null) {
             this.vertexTexCoordBuffer = gl.createBuffer();
         }
+        if (this.meshCoordsBuffer == null) {
+            this.meshCoordsBuffer = gl.createBuffer();
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.vertices, gl.STATIC_DRAW); // allocate and fill the buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexNormalBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, this.normals, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshCoordsBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.meshCoords, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.indices, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexTexCoordBuffer);
@@ -3172,6 +3180,14 @@ var InfinitePlane = /** @class */ (function (_super) {
             }
         }
     };
+    InfinitePlane.prototype.pushMeshCoords = function (xs, ys, coords) {
+        for (var i = 0; i < xs.length; i++) {
+            for (var j = 0; j < ys.length; j++) {
+                coords.push(xs[i]);
+                coords.push(ys[j]);
+            }
+        }
+    };
     // pushes indices for a subdivided quad
     InfinitePlane.prototype.pushIndices = function (offset, cols, rows, planeVertexIndices) {
         for (var i = 0; i < rows - 1; i++) {
@@ -3198,6 +3214,7 @@ var InfinitePlane = /** @class */ (function (_super) {
             var vertices = [];
             var uvs = [];
             var planeVertexIndices = [];
+            var meshCoords = [];
             var centerSize = 2;
             // center quad
             {
@@ -3205,8 +3222,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                 var ys = this.subdivide(centerSize / 2, -centerSize / 2, this.subdivs.v);
                 var us = this.subdivide(0, 1, this.subdivs.u);
                 var vs = this.subdivide(0, 1, this.subdivs.v);
+                var mxs = this.subdivide(0, 1 << this.subdivs.u, this.subdivs.u);
+                var mys = this.subdivide(0, 1 << this.subdivs.v, this.subdivs.v);
+                console.log(mxs);
                 this.pushVertices(xs, ys, vertices);
                 this.pushUVs(us, vs, uvs);
+                this.pushMeshCoords(mxs, mys, meshCoords);
                 this.pushIndices(0, xs.length, ys.length, planeVertexIndices);
             }
             var inner_tl = new gml.Vec2(-1, 1);
@@ -3234,9 +3255,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 1
@@ -3245,9 +3269,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 2
@@ -3256,9 +3283,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 3
@@ -3267,9 +3297,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(outer_tl.y, inner_tl.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 4
@@ -3278,9 +3311,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_tl.y, inner_tl.y - size, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 5
@@ -3289,9 +3325,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_tl.y - size, inner_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 5
@@ -3300,9 +3339,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_br.y, outer_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 7
@@ -3311,9 +3353,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_br.y, outer_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 8
@@ -3322,9 +3367,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_br.y, outer_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 9
@@ -3333,9 +3381,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_br.y, outer_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 10
@@ -3344,9 +3395,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_tl.y - size, inner_br.y, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 // shell 11
@@ -3355,9 +3409,12 @@ var InfinitePlane = /** @class */ (function (_super) {
                     var ys = this.subdivide(inner_tl.y, inner_tl.y - size, 5);
                     var us = this.subdivide(0, 1, 5);
                     var vs = this.subdivide(0, 1, 5);
+                    var mxs = this.subdivide(0, 1 << 5, 5);
+                    var mys = this.subdivide(0, 1 << 5, 5);
                     var offset = vertices.length / 3;
                     this.pushVertices(xs, ys, vertices);
                     this.pushUVs(us, vs, uvs);
+                    this.pushMeshCoords(mxs, mys, meshCoords);
                     this.pushIndices(offset, xs.length, ys.length, planeVertexIndices);
                 }
                 lastSize *= 2;
@@ -3366,6 +3423,7 @@ var InfinitePlane = /** @class */ (function (_super) {
             }
             this.renderData.vertices = new Float32Array(vertices);
             this.renderData.textureCoords = new Float32Array(uvs);
+            this.renderData.meshCoords = new Float32Array(meshCoords);
             var vertexNormals = [];
             // flat plane; normals are all the same
             for (var i = 0; i < vertices.length / 3; i++) {
@@ -3977,6 +4035,10 @@ var Renderer = /** @class */ (function () {
         var uniforms = this.programData[sp].uniforms;
         uniforms.aVertexPosition = gl.getAttribLocation(program, "aVertexPosition");
         gl.enableVertexAttribArray(uniforms.aVertexPosition);
+        uniforms.aMeshCoord = gl.getAttribLocation(program, "aMeshCoord");
+        if (uniforms.aMeshCoord >= 0) {
+            gl.enableVertexAttribArray(uniforms.aMeshCoord);
+        }
         uniforms.aVertexNormal = gl.getAttribLocation(program, "aVertexNormal");
         if (uniforms.aVertexNormal >= 0) {
             gl.enableVertexAttribArray(uniforms.aVertexNormal);
@@ -3996,6 +4058,7 @@ var Renderer = /** @class */ (function () {
         uniforms.uCameraPos = gl.getUniformLocation(program, "cPosition_World");
         uniforms.uEnvMap = gl.getUniformLocation(program, "environment");
         uniforms.uVolume = gl.getUniformLocation(program, "volume");
+        uniforms.uWireframe = gl.getUniformLocation(program, "uDrawWireframe");
         uniforms.uProcSky = gl.getUniformLocation(program, "proceduralSky");
         uniforms.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
         uniforms.uEnvironmentMipMaps = gl.getUniformLocation(program, "environmentMipMaps");
@@ -4153,6 +4216,7 @@ var Renderer = /** @class */ (function () {
                     var shaderVariables_6 = _this.programData[_this.currentProgram].uniforms;
                     gl.uniform1f(shaderVariables_6.uTime, scene.time);
                     gl.uniform1f(shaderVariables_6.uCloudiness, scene.cloudiness);
+                    gl.uniform1i(shaderVariables_6.uWireframe, p.material.wireframe ? 1 : 0);
                 }
             }
             else if (p.material instanceof NoiseMaterial) {
@@ -4196,6 +4260,10 @@ var Renderer = /** @class */ (function () {
             gl.uniformMatrix3fv(shaderVariables.uInverseView, false, inverseViewMatrix.m);
             gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.vertexBuffer);
             gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+            if (shaderVariables.aMeshCoord >= 0 && p.renderData.meshCoordsBuffer != null) {
+                gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.meshCoordsBuffer);
+                gl.vertexAttribPointer(shaderVariables.aMeshCoord, 2, gl.FLOAT, false, 0, 0);
+            }
             if (shaderVariables.aVertexTexCoord >= 0) {
                 gl.bindBuffer(gl.ARRAY_BUFFER, p.renderData.vertexTexCoordBuffer);
                 gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
@@ -4232,6 +4300,9 @@ var Renderer = /** @class */ (function () {
         }
         if (shaderVariables.aVertexTexCoord >= 0) {
             gl.enableVertexAttribArray(shaderVariables.aVertexTexCoord);
+        }
+        if (shaderVariables.aMeshCoord >= 0) {
+            gl.enableVertexAttribArray(shaderVariables.aMeshCoord);
         }
         this.currentProgram = program;
     };
@@ -4798,6 +4869,11 @@ var SkyApp = /** @class */ (function () {
         var cloudSpeedSlider = document.getElementById("wind-slider");
         cloudinessSlider.oninput = changeCloudiness;
         cloudSpeedSlider.oninput = changeCloudSpeed;
+        var wireframeCheckbox = document.getElementById("water-wireframe");
+        wireframeCheckbox.onchange = changeWireframe;
+        var showFPSCheckbox = document.getElementById("debug-fps");
+        showFPSCheckbox.onchange = changeShowFPS;
+        this.FPSContainer = document.getElementById("fps-indicator");
         params.vp.addEventListener('mousedown', function (ev) {
             switch (ev.button) {
                 case 0:// left
@@ -4828,12 +4904,17 @@ var SkyApp = /** @class */ (function () {
                 _this.lastMousePos.x = ev.clientX;
                 _this.lastMousePos.y = ev.clientY;
                 _this.yaw = _this.yaw.add(gml.fromRadians(-deltaX * PAN_PIXEL_TO_RADIAN).negate()).reduceToOneTurn();
-                _this.pitch = _this.pitch.add(gml.fromRadians(-deltaY * PAN_PIXEL_TO_RADIAN)).reduceToOneTurn();
-                /*
-                if ( this.pitch.toDegrees() > 40 ) {
-                  this.pitch = gml.fromDegrees( 40 );
+                var newPitch = _this.pitch.add(gml.fromRadians(-deltaY * PAN_PIXEL_TO_RADIAN)).reduceToOneTurn();
+                var deg = newPitch.toDegrees();
+                if (deg > 90 && deg < 270) {
+                    if (Math.abs(90 - deg) < 90) {
+                        newPitch = gml.fromDegrees(90);
+                    }
+                    else {
+                        newPitch = gml.fromDegrees(270);
+                    }
                 }
-                 */
+                _this.pitch = newPitch;
                 _this.dirty = true;
                 ev.preventDefault();
                 return false;
@@ -4849,10 +4930,24 @@ function changeCloudiness(e) {
 function changeCloudSpeed(e) {
     scene.cloudSpeed = e.target.value / 2; // 1 to 50
 }
+function changeWireframe(e) {
+    watermat.wireframe = e.target.checked;
+}
+function changeShowFPS(e) {
+    if (e.target.checked) {
+        app.FPSContainer.style.visibility = "visible";
+    }
+    else {
+        app.FPSContainer.style.visibility = "hidden";
+    }
+}
 function changeFrameLimit(e) {
     switch (e.target.value) {
         case "adaptive":
             frameLimit = -1;
+            break;
+        case "30":
+            frameLimit = 30;
             break;
         case "60":
             frameLimit = 60;
@@ -4872,6 +4967,7 @@ var app = null;
 var scene = null;
 var lastFrame = null;
 var finishedDownloadingTexture = false;
+var watermat;
 function updateAndDraw(t) {
     var dt = (t - lastFrame) / 1000.0;
     if (frameLimit != -1 && dt < 1.0 / frameLimit) {
@@ -4899,6 +4995,7 @@ function updateAndDraw(t) {
         app.renderer.dirty = true;
         app.renderer.render();
     }
+    app.FPSContainer.innerHTML = "FPS: " + Math.round(1.0 / dt);
     window.requestAnimationFrame(updateAndDraw);
 }
 function StartSky() {
@@ -4918,8 +5015,9 @@ function StartSky() {
                     scene.noiseVolumes[1] = texture;
                 })]);
             Scene.setActiveScene(scene);
+            watermat = new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53);
             // ocean
-            scene.addRenderable(new InfinitePlane(12, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53)));
+            scene.addRenderable(new InfinitePlane(12, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, watermat));
             lastFrame = performance.now();
             var cloudinessSlider = document.getElementById("cloud-slider");
             var cloudSpeedSlider = document.getElementById("wind-slider");

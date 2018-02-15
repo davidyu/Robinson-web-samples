@@ -3,12 +3,14 @@ uniform float uTime;
 
 in vec4 vPosition;
 in vec4 vPosition_World;
+in vec2 vQuadCoord;
 in float vAmp;
 
 uniform highp mat4 uVMatrix;
 uniform highp mat3 uInverseViewMatrix;
 uniform highp mat3 uNormalMVMatrix;    // inverse model view matrix
 uniform float uCloudiness;
+uniform bool uDrawWireframe;
 
 uniform samplerCube environment;
 uniform float environmentMipMaps;
@@ -171,6 +173,12 @@ float foam( vec2 pos, float detailed_height )
     return max( foam, 0.0 );
 }
 
+float edgeFactor( vec4 vRel ) {
+    vec4 d = fwidth( vRel );
+    vec4 a4 = smoothstep( vec4( 0.0 ), d * 1.4, vRel );
+    return min( min( min( a4.x, a4.y ), a4.z ), a4.w );
+}
+
 void main( void ) {
     float cached_height = height_detailed( vPosition_World.xz * sea_scale );
 
@@ -200,4 +208,10 @@ void main( void ) {
     color = mix( color, vec4( 1.0, 1.0, 1.0, 1.0 ), foam( vPosition_World.xz * sea_scale, cached_height ) );
 
     fragColor = degamma( color );
+
+    if ( uDrawWireframe ) {
+        vec2 vRel = fract( vQuadCoord );
+        fragColor = mix( fragColor, vec4( 1.0, 0.0, 0.0, 1.0 ), 1.0 - edgeFactor( vec4( vRel, 1.0 - vRel ) ) );
+        return;
+    }
 }
