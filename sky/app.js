@@ -3224,7 +3224,6 @@ var InfinitePlane = /** @class */ (function (_super) {
                 var vs = this.subdivide(0, 1, this.subdivs.v);
                 var mxs = this.subdivide(0, 1 << this.subdivs.u, this.subdivs.u);
                 var mys = this.subdivide(0, 1 << this.subdivs.v, this.subdivs.v);
-                console.log(mxs);
                 this.pushVertices(xs, ys, vertices);
                 this.pushUVs(us, vs, uvs);
                 this.pushMeshCoords(mxs, mys, meshCoords);
@@ -3756,7 +3755,7 @@ var SHADER_PROGRAM;
     SHADER_PROGRAM[SHADER_PROGRAM["SKYBOX"] = 5] = "SKYBOX";
     SHADER_PROGRAM[SHADER_PROGRAM["SKY"] = 6] = "SKY";
     SHADER_PROGRAM[SHADER_PROGRAM["WATER"] = 7] = "WATER";
-    SHADER_PROGRAM[SHADER_PROGRAM["WATER_SS"] = 8] = "WATER_SS";
+    SHADER_PROGRAM[SHADER_PROGRAM["WATER_SCREENSPACE"] = 8] = "WATER_SCREENSPACE";
     SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 9] = "CUBE_SH";
     SHADER_PROGRAM[SHADER_PROGRAM["NOISE_WRITER"] = 10] = "NOISE_WRITER";
     SHADER_PROGRAM[SHADER_PROGRAM["VOLUME_VIEWER"] = 11] = "VOLUME_VIEWER";
@@ -3983,9 +3982,9 @@ var Renderer = /** @class */ (function () {
             alert("Screenspace water compilation failed. Please check the log for details.");
             success = false;
         }
-        this.programData[SHADER_PROGRAM.WATER_SS] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.WATER_SS_FRAG].source);
-        this.programData[SHADER_PROGRAM.WATER_SS].program = waterSSProgram;
-        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER_SS);
+        this.programData[SHADER_PROGRAM.WATER_SCREENSPACE] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.WATER_SS_FRAG].source);
+        this.programData[SHADER_PROGRAM.WATER_SCREENSPACE].program = waterSSProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.WATER_SCREENSPACE);
         var noiseWriterProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.NOISE_WRITER_FRAG].source);
         if (noiseWriterProgram == null) {
             alert("Noise writer compilation failed. Please check the log for details.");
@@ -4067,6 +4066,7 @@ var Renderer = /** @class */ (function () {
         uniforms.uCloudSpeed = gl.getUniformLocation(program, "uCloudSpeed");
         uniforms.uNoiseLayer = gl.getUniformLocation(program, "uNoiseLayer");
         uniforms.uPerlinNoise = gl.getUniformLocation(program, "uPerlinNoise");
+        uniforms.uSparseWorleyNoise = gl.getUniformLocation(program, "uSparseWorleyNoise");
         uniforms.uWorleyNoise = gl.getUniformLocation(program, "uWorleyNoise");
         uniforms.uMaterial = new ShaderMaterialProperties();
         uniforms.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
@@ -4204,7 +4204,7 @@ var Renderer = /** @class */ (function () {
             }
             else if (p.material instanceof WaterMaterial) {
                 if (p.material.screenspace) {
-                    _this.useProgram(gl, SHADER_PROGRAM.WATER_SS);
+                    _this.useProgram(gl, SHADER_PROGRAM.WATER_SCREENSPACE);
                     var shaderVariables_5 = _this.programData[_this.currentProgram].uniforms;
                     gl.uniform1f(shaderVariables_5.uTime, scene.time);
                     gl.uniform1f(shaderVariables_5.uCloudiness, scene.cloudiness);
@@ -4216,6 +4216,7 @@ var Renderer = /** @class */ (function () {
                     var shaderVariables_6 = _this.programData[_this.currentProgram].uniforms;
                     gl.uniform1f(shaderVariables_6.uTime, scene.time);
                     gl.uniform1f(shaderVariables_6.uCloudiness, scene.cloudiness);
+                    gl.uniform1f(shaderVariables_6.uCloudSpeed, scene.cloudSpeed);
                     gl.uniform1i(shaderVariables_6.uWireframe, p.material.wireframe ? 1 : 0);
                 }
             }
@@ -4382,6 +4383,8 @@ var Renderer = /** @class */ (function () {
                 // 
                 // GENERATE ENVIRONMENT MAP, IF NECESSARY
                 if (scene.hasEnvironment && scene.dynamicEnvironment) {
+                    if (this.enableTracing)
+                        console.time("environment map");
                     if (scene.dynamicEnvironment) {
                         // render using specified shader
                         // TODO: actually pass in shader into scene
@@ -4391,6 +4394,8 @@ var Renderer = /** @class */ (function () {
                         // generate static cube map from face images - we only do this once
                         scene.environmentMap.generateCubeMapFromSources(gl);
                     }
+                    if (this.enableTracing)
+                        console.timeEnd("environment map");
                 }
                 //
                 // SET UP IRRADIANCE MAP
@@ -4413,11 +4418,19 @@ var Renderer = /** @class */ (function () {
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
                 // draw environment map
                 if (scene.hasEnvironment) {
+                    if (this.enableTracing)
+                        console.time("environment");
                     this.renderSceneEnvironment(gl, scene, mvStack, this.viewportW, this.viewportH);
+                    if (this.enableTracing)
+                        console.timeEnd("environment");
                 }
                 // draw scene
                 gl.clear(gl.DEPTH_BUFFER_BIT);
+                if (this.enableTracing)
+                    console.time("render scene");
                 this.renderScene(gl, scene, mvStack, PASS.STANDARD_FORWARD);
+                if (this.enableTracing)
+                    console.timeEnd("render scene");
             }
         }
     };
@@ -4543,10 +4556,9 @@ var CubeMap = /** @class */ (function () {
     return CubeMap;
 }());
 var Scene = /** @class */ (function () {
-    function Scene(environmentMap, irradianceMap, hasEnvironment, dynamicEnvironment, noiseVolumes) {
+    function Scene(environmentMap, irradianceMap, hasEnvironment, dynamicEnvironment, noiseVolume) {
         if (hasEnvironment === void 0) { hasEnvironment = false; }
         if (dynamicEnvironment === void 0) { dynamicEnvironment = false; }
-        if (noiseVolumes === void 0) { noiseVolumes = []; }
         this.renderables = [];
         this.lights = [];
         this.environmentMap = environmentMap;
@@ -4554,9 +4566,9 @@ var Scene = /** @class */ (function () {
         this.time = 0;
         this.hasEnvironment = hasEnvironment;
         this.dynamicEnvironment = dynamicEnvironment;
-        this.noiseVolumes = noiseVolumes;
+        this.noiseVolume = noiseVolume;
         this.cloudiness = 0.25;
-        this.cloudSpeed = 3;
+        this.cloudSpeed = 1.5;
     }
     Scene.prototype.addRenderable = function (renderable) {
         this.renderables.push(renderable);
@@ -4659,13 +4671,10 @@ var Scene = /** @class */ (function () {
         gl.uniform1i(variables.uEnvMap, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRT);
-        if (this.noiseVolumes.length > 0) {
+        if (this.noiseVolume != null) {
             gl.uniform1i(variables.uPerlinNoise, 1);
             gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_3D, this.noiseVolumes[0]);
-            gl.uniform1i(variables.uWorleyNoise, 2);
-            gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_3D, this.noiseVolumes[1]);
+            gl.bindTexture(gl.TEXTURE_3D, this.noiseVolume);
         }
         gl.drawElements(gl.TRIANGLES, this.fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
@@ -4869,11 +4878,15 @@ var SkyApp = /** @class */ (function () {
         var cloudSpeedSlider = document.getElementById("wind-slider");
         cloudinessSlider.oninput = changeCloudiness;
         cloudSpeedSlider.oninput = changeCloudSpeed;
+        cloudSpeedSlider.onchange = changeFinished;
         var wireframeCheckbox = document.getElementById("water-wireframe");
         wireframeCheckbox.onchange = changeWireframe;
         var showFPSCheckbox = document.getElementById("debug-fps");
         showFPSCheckbox.onchange = changeShowFPS;
         this.FPSContainer = document.getElementById("fps-indicator");
+        var playbackButton = document.getElementById("toggle-playback");
+        playbackButton.onclick = togglePlayback;
+        document.body.onmouseup = changeFinished;
         params.vp.addEventListener('mousedown', function (ev) {
             switch (ev.button) {
                 case 0:// left
@@ -4924,11 +4937,21 @@ var SkyApp = /** @class */ (function () {
     return SkyApp;
 }());
 var frameLimit = -1;
+var stoptime = false;
+var lastAdjusted = ""; // need this
 function changeCloudiness(e) {
     scene.cloudiness = e.target.value / 100;
 }
 function changeCloudSpeed(e) {
-    scene.cloudSpeed = e.target.value / 2; // 1 to 50
+    lastAdjusted = "cloudspeed";
+    stoptime = true;
+    scene.cloudSpeed = e.target.value / 30; // 1 to 3.33ish
+}
+function changeFinished(e) {
+    if (lastAdjusted == "cloudspeed") {
+        stoptime = false;
+    }
+    lastAdjusted = "";
 }
 function changeWireframe(e) {
     watermat.wireframe = e.target.checked;
@@ -4941,10 +4964,22 @@ function changeShowFPS(e) {
         app.FPSContainer.style.visibility = "hidden";
     }
 }
+function togglePlayback(e) {
+    stoptime = !stoptime;
+    if (stoptime) {
+        e.target.value = '\u25B6';
+    }
+    else {
+        e.target.value = '\u275A\u275A';
+    }
+}
 function changeFrameLimit(e) {
     switch (e.target.value) {
         case "adaptive":
             frameLimit = -1;
+            break;
+        case "15":
+            frameLimit = 15;
             break;
         case "30":
             frameLimit = 30;
@@ -4965,17 +5000,30 @@ function changeFrameLimit(e) {
 }
 var app = null;
 var scene = null;
+var noise = null;
 var lastFrame = null;
+var texturesDownloaded = 0;
 var finishedDownloadingTexture = false;
+var worley_data = null;
+var sparse_data = null;
+var perlin_data = null;
 var watermat;
 function updateAndDraw(t) {
-    var dt = (t - lastFrame) / 1000.0;
-    if (frameLimit != -1 && dt < 1.0 / frameLimit) {
-        window.requestAnimationFrame(updateAndDraw);
+    // request another refresh
+    requestAnimationFrame(updateAndDraw);
+    var dtInMillis = t - lastFrame;
+    var dt = dtInMillis / 1000.0;
+    var interval = 1000.0 / frameLimit;
+    if (frameLimit != -1 && dtInMillis < interval) {
         return;
     }
     lastFrame = t;
-    scene.time += dt;
+    if (frameLimit != -1) {
+        lastFrame -= (dtInMillis % interval);
+    }
+    if (!stoptime) {
+        scene.time += dt;
+    }
     if (app.dirty) {
         // rebuild camera
         var baseAim = new gml.Vec4(0, 0, -1, 0);
@@ -4988,15 +5036,18 @@ function updateAndDraw(t) {
         app.camera = new Camera(rotPos, rotAim, rotUp, rotRight);
         app.renderer.setCamera(app.camera);
         app.renderer.update();
-        app.dirty = false;
     }
-    // this is way too slow
-    if (finishedDownloadingTexture) {
+    if ((!stoptime || app.dirty) && finishedDownloadingTexture) {
         app.renderer.dirty = true;
         app.renderer.render();
     }
+    app.dirty = false;
     app.FPSContainer.innerHTML = "FPS: " + Math.round(1.0 / dt);
-    window.requestAnimationFrame(updateAndDraw);
+}
+// download the two textures we care about, then build them, then inject into scene
+function composeNoiseTextures(gl) {
+    var texture = noise.composeFromPackedData(gl, { r: { data: perlin_data, size: 128 }, g: { data: worley_data, size: 64 }, b: { data: sparse_data, size: 64 } });
+    scene.noiseVolume = texture;
 }
 function StartSky() {
     if (app == null) {
@@ -5009,21 +5060,51 @@ function StartSky() {
             app = new SkyApp(params, repo);
             var gl = app.renderer.context;
             app.editor.install();
-            var noise = new Noise();
-            scene = new Scene(null, null, true, true, [noise.perlin3Texture(gl, 128), noise.textureFromOfflinePackedData(gl, "worley.blob", 64, function (texture) {
-                    finishedDownloadingTexture = true;
-                    scene.noiseVolumes[1] = texture;
-                })]);
+            noise = new Noise();
+            // download two blob files
+            var worley_req = new XMLHttpRequest();
+            worley_req.addEventListener("load", function (evt) {
+                texturesDownloaded++;
+                finishedDownloadingTexture = texturesDownloaded == 2;
+                worley_data = new Uint8Array(worley_req.response);
+                if (finishedDownloadingTexture) {
+                    composeNoiseTextures(gl);
+                }
+            });
+            worley_req.open("GET", "worley.blob", true);
+            worley_req.responseType = "arraybuffer";
+            worley_req.send();
+            var sparse_req = new XMLHttpRequest();
+            sparse_req.addEventListener("load", function (evt) {
+                sparse_data = new Uint8Array(sparse_req.response);
+                texturesDownloaded++;
+                finishedDownloadingTexture = texturesDownloaded == 2;
+                if (finishedDownloadingTexture) {
+                    composeNoiseTextures(gl);
+                }
+            });
+            sparse_req.open("GET", "sparse_worley.blob", true);
+            sparse_req.responseType = "arraybuffer";
+            sparse_req.send();
+            perlin_data = noise.perlin3TextureDataPacked(128);
+            var emptyTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_3D, emptyTexture);
+            // no mips, 1x1x1...
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+            gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+            gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, 1, 1, 1, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0]));
+            gl.bindTexture(gl.TEXTURE_3D, null);
+            scene = new Scene(null, null, true, true, emptyTexture);
             Scene.setActiveScene(scene);
             watermat = new WaterMaterial(new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), new gml.Vec4(1.0, 1.0, 1.0, 1), 1.53);
             // ocean
-            scene.addRenderable(new InfinitePlane(12, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 7, v: 7 }, watermat));
+            scene.addRenderable(new InfinitePlane(12, 4, new gml.Vec4(0, 0, 0, 1), { x: gml.fromDegrees(0), y: gml.fromDegrees(0), z: gml.fromDegrees(0) }, { u: 6, v: 6 }, watermat));
             lastFrame = performance.now();
             var cloudinessSlider = document.getElementById("cloud-slider");
             var cloudSpeedSlider = document.getElementById("wind-slider");
             cloudinessSlider.value = (scene.cloudiness * 100).toString();
-            cloudSpeedSlider.value = (scene.cloudSpeed * 2).toString();
-            window.requestAnimationFrame(updateAndDraw);
+            cloudSpeedSlider.value = (scene.cloudSpeed * 50).toString();
+            updateAndDraw(performance.now());
             // screenspace ocean
             /*
             scene.addRenderable( new Quad( 1
@@ -5041,6 +5122,9 @@ function StartSky() {
 // Implementation heavily based on josephg's noisejs, which is based on Stefan Gustavson's implementation.
 // Source:
 //  https://github.com/josephg/noisejs/blob/master/perlin.js
+function isPowerOfTwo(x) {
+    return (x & (x - 1)) == 0;
+}
 var Noise = /** @class */ (function () {
     function Noise() {
         this.worleySeed = 0;
@@ -5185,12 +5269,24 @@ var Noise = /** @class */ (function () {
         gl.bindTexture(gl.TEXTURE_3D, null);
         return noiseTexture;
     };
+    Noise.prototype.perlin3TextureDataPacked = function (size) {
+        var rgb = [];
+        for (var z = 0; z < size; z++) {
+            for (var y = 0; y < size; y++) {
+                for (var x = 0; x < size; x++) {
+                    var n = this.perlin3(x * 1.0005, y * 1.0005, z * 1.0005, size - 1);
+                    rgb.push(n * 255); // R
+                }
+            }
+        }
+        return new Uint8Array(rgb);
+    };
     Noise.prototype.perlin3Texture = function (gl, size) {
         var rgb = [];
         for (var z = 0; z < size; z++) {
             for (var y = 0; y < size; y++) {
                 for (var x = 0; x < size; x++) {
-                    var n = this.perlin3(x * 1.001, y * 1.001, z * 1.001, size - 1);
+                    var n = this.perlin3(x * 1.0005, y * 1.0005, z * 1.0005, size - 1);
                     rgb.push(n * 255); // R
                     rgb.push(n * 255); // G
                     rgb.push(n * 255); // B
@@ -5275,6 +5371,48 @@ var Noise = /** @class */ (function () {
         let nearest = this.worleyFeaturePointKDTree.findNearest( pt, Number.MAX_VALUE );
         return nearest;
          */
+    };
+    Noise.prototype.composeFromPackedData = function (gl, packed) {
+        var unpacked = [];
+        if (!isPowerOfTwo(packed.r.size) || !isPowerOfTwo(packed.g.size) || !isPowerOfTwo(packed.b.size))
+            debugger;
+        var size = Math.max(packed.r.size, packed.g.size, packed.b.size);
+        var scale = { r: packed.r.size / size, g: packed.g.size / size, b: packed.b.size / size };
+        for (var z = 0; z < size; z++) {
+            for (var y = 0; y < size; y++) {
+                for (var x = 0; x < size; x++) {
+                    var index = z * size * size + y * size + x;
+                    var x_r = Math.floor(scale.r * x);
+                    var y_r = Math.floor(scale.r * y);
+                    var z_r = Math.floor(scale.r * z);
+                    var size_r = scale.r * size;
+                    var x_g = Math.floor(scale.g * x);
+                    var y_g = Math.floor(scale.g * y);
+                    var z_g = Math.floor(scale.g * z);
+                    var size_g = scale.g * size;
+                    var x_b = Math.floor(scale.b * x);
+                    var y_b = Math.floor(scale.b * y);
+                    var z_b = Math.floor(scale.b * z);
+                    var size_b = scale.b * size;
+                    var r_index = z_r * size_r * size_r + y_r * size_r + x_r;
+                    var g_index = z_g * size_g * size_g + y_g * size_g + x_g;
+                    var b_index = z_b * size_b * size_b + y_b * size_b + x_b;
+                    unpacked.push(packed.r.data[r_index]);
+                    unpacked.push(packed.g.data[g_index]);
+                    unpacked.push(packed.b.data[b_index]);
+                }
+            }
+        }
+        var noiseTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, noiseTexture);
+        // no mips
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_BASE_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAX_LEVEL, 0);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGB, size, size, size, 0, gl.RGB, gl.UNSIGNED_BYTE, new Uint8Array(unpacked));
+        gl.bindTexture(gl.TEXTURE_3D, null);
+        return noiseTexture;
     };
     Noise.prototype.textureFromOfflinePackedData = function (gl, path, size, loadDoneCallback) {
         var _this = this;

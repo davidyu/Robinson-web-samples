@@ -13,7 +13,6 @@ uniform highp mat3 uNormalMVMatrix;    // inverse model view matrix
 
 uniform mediump float uTime;
 uniform mediump vec4 cPosition_World;
-uniform mediump float uCloudSpeed;
 
 out mediump vec3  vDirection;
 out mediump vec4  vPosition;
@@ -21,12 +20,11 @@ out mediump vec4  vPosition_World;
 out mediump float vAmp;
 out mediump vec2  vQuadCoord;
 
-// these are constants for all intents and purposes
-flat out float sea_speed;
-flat out float sea_choppiness;
-flat out float sea_frequency;
-flat out float sea_amplitude;
-flat out float sea_scale;
+const float sea_speed = 2.0;
+const float sea_choppiness = 4.0;
+const float sea_frequency = 0.1;
+const float sea_amplitude = 0.6;
+const float sea_scale = 0.6;
 
 // based on Shadertoy "Seascape" entry by TDM
 
@@ -106,13 +104,6 @@ float height( vec2 p )
 }
 
 void main() {
-    float calmness = uCloudSpeed / 3.334; // bootstrap on cloud speed; it is normalized between 1 and 3.333 repeating
-    sea_speed = 2.0;
-    sea_choppiness = mix( 3.0, 4.0, calmness );
-    sea_frequency = mix( 0.09, 0.11, calmness );
-    sea_amplitude = mix( 0.3, 0.6, calmness );
-    sea_scale = 0.6;
-
     vPosition = vec4( aVertexPosition, 1.0 );
 
     // transform from local to world

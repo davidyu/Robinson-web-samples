@@ -7,6 +7,7 @@ uniform vec4 cPosition_World;
 uniform float uTime;
 uniform sampler3D uPerlinNoise;
 uniform sampler3D uWorleyNoise;
+uniform sampler3D uSparseWorleyNoise;
 uniform float uCloudiness;
 uniform float uCloudSpeed;
 
@@ -15,7 +16,7 @@ in vec3 vDirection;
 const   vec3  sun_light_dir = normalize( vec3( 0.0, 1.0, 0.4 ) );
 const   float sun_flare_size = 0.5;
 
-const   float sky_saturation = 0.7;       // how blue should the sky be (if we look straight up)
+const   float sky_saturation = 0.45;       // how blue should the sky be (if we look straight up)
 const   float sky_horizon_offset = -0.3;  // between -1 and 1, moves horizon down if negative, moves horizon up if positive 
 
 const   float cloud_scale = 0.0015;
@@ -23,34 +24,51 @@ const   float cloud_scale = 0.0015;
 const   vec3  cloud_base_color = vec3( 0.3, 0.4, 0.5 );
 const   vec3  cloud_top_color  = vec3( 1.0 );
 
+const   vec3  sea_base_color  = vec3( 0.1,0.27,0.3 );
+const   vec3  sea_water_color = vec3( 0.8,0.9,0.6 );
+
+const   vec3  sea_color_mixed  = mix( sea_base_color, sea_water_color, 0.5 );
+
 out vec4 fragColor;
 
 #define PI 3.14159
 
-#define WORLEY_SAMPLE_MAX 12.0
+#define WORLEY_SAMPLE_MAX 32
 float worley(vec3 x) {
-    return texture( uWorleyNoise, fract( x / vec3( WORLEY_SAMPLE_MAX ) ) ).r;
+    return texture( uSparseWorleyNoise, fract( x / vec3( WORLEY_SAMPLE_MAX ) ) ).r;
 }
 
-#define PERLIN_SAMPLE_MAX 128
+#define BILLOW_SAMPLE_MAX 50
+float billows(vec3 x) {
+    return texture( uWorleyNoise, fract( x / vec3( BILLOW_SAMPLE_MAX ) ) ).r;
+}
+
+#define PERLIN_SAMPLE_MAX 90
 float pnoise( vec3 x ) {
     return texture( uPerlinNoise, fract( x / vec3( PERLIN_SAMPLE_MAX ) ) ).r;
 }
 
-float sample_cloud( vec3 x ) {
+float sample_cloud( vec3 pos ) {
+    vec3 x = pos;
     float v = 0.0;
     float a = 0.5;
     vec3 shift = vec3( 100 );
     const int NUM_OCTAVES = 4;
+    
     for (int i = 0; i < NUM_OCTAVES; ++i) {
-        v += mix( 0.2, 0.4, uCloudiness ) * a * worley( x ); // macro, billow-y shapes
-        v += mix( 0.2, 0.4, uCloudiness ) * a * pnoise( x ); // add wispiness
+        // float base_shape = worley( x );
+        // float billows = billows( x );
+        // float wispy = pnoise( x );
+        float wispy = texture( uPerlinNoise, fract( x / vec3( 90 ) ) ).r;
+        float billows = texture( uPerlinNoise, fract( x / vec3( 90 ) ) ).g;
+        float base_shape = texture( uPerlinNoise, fract( x / vec3( 90 ) ) ).b;
+        base_shape += wispy * 0.07;
+        v += uCloudiness * a * base_shape * ( 1. + uCloudiness * 3.0 * billows + wispy ); // macro, billow-y shapes
         x = x * 2.3 + shift;
-        a *= 0.5;
+        a *= 0.45;
 	}
-
-    // smoothstep parameter carefully tuned to look cloudlike
-    return smoothstep( 0.15, 0.55, v );
+	
+    return smoothstep( 0.0, 1., v );
 }
 
 vec3 sun( vec3 v ) {
@@ -85,11 +103,11 @@ vec4 clouds( vec3 v )
     // this doesn't seem to save any frames, though
     if ( dot( vec3( 0.0, 1.0, 0.0 ), v ) < 0.0 ) return acc;
 
-    const int samples = 32;
+    const int samples = 64;
     for ( int i = 0; i < samples; i++ ) {
         float d = ( float( i ) * 12.0 + 200.0 - cPosition_World.y ) / v.y;
         vec3 cloudPos = cloud_scale * ( cPosition_World.xyz + d * v + ofs );
-        float cloud_sample = uCloudiness * sample_cloud( cloudPos );
+        float cloud_sample = sample_cloud( cloudPos );
 
         vec3 cloud_color = mix( vec3( 1.0, 1.0, 1.0 ), cloud_base_color, cloud_sample );
 
@@ -123,7 +141,7 @@ void main() {
     vec3 eye = normalize( vDirection );
 
     // we only care about the range of values from sky_horizon_offset to 1.0
-    float sky_h = clamp( eye.y, sky_horizon_offset, 1.0 );
+    float sky_h = clamp( abs( eye.y ), sky_horizon_offset, 1.0 );
 
     // transform from [sky_horizon_offset, 1.0] to [0, 1.0]
     sky_h = ( sky_h - sky_horizon_offset ) / ( 1.0 - sky_horizon_offset );
@@ -140,11 +158,15 @@ void main() {
     sky = desaturate( sky, 0.5 * uCloudiness * uCloudiness ); // desaturate with cloudiness
     sky *= ( 1.0 - 0.5 * uCloudiness * uCloudiness ); // darken with cloudiness
 
-    sky += sun( eye );
-    vec4 cl = clouds( eye );
+    if ( eye.y > sky_horizon_offset ) {
+        sky += sun( eye );
+        vec4 cl = clouds( eye );
 
-    float t = pow( 1.0 - 0.7 * vDirection.y, 15.0 ); // what is t?
-    sky = mix( sky, cl.rgb, cl.a * ( 1.0 - t ) );
+        float t = pow( 1.0 - 0.7 * vDirection.y, 15.0 ); // what is t?
+        sky = mix( sky, cl.rgb, cl.a * ( 1.0 - t ) );
+    } else {
+        sky = mix( sky, sea_color_mixed, 0.5 );
+    }
 
     fragColor = vec4( sky.r, sky.g, sky.b, 1.0 );
 }

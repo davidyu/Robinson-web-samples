@@ -16,16 +16,14 @@ uniform samplerCube environment;
 uniform float environmentMipMaps;
 
 const   vec3  sun_light_dir = normalize( vec3( 0.0, 1.0, 0.4 ) );  // radius of sun sphere
-
-const   vec3  sea_base_color  = vec3( 0.1,0.27,0.3 );
+const   vec3  sea_base_color  = vec3( 0.1,0.19,0.22 );
 const   vec3  sea_water_color = vec3( 0.8,0.9,0.6 );
-const   vec3  sea_water_color_cloudy = vec3( 0.5,0.55,0.4 );
 
-flat in float sea_speed;
-flat in float sea_choppiness;
-flat in float sea_frequency;
-flat in float sea_amplitude;
-flat in float sea_scale;
+const float sea_speed = 2.0;
+const float sea_choppiness = 4.0;
+const float sea_frequency = 0.1;
+const float sea_amplitude = 0.6;
+const float sea_scale = 0.6;
 
 out vec4 fragColor;
 
@@ -196,18 +194,16 @@ void main( void ) {
     
     vec3 lightdir = normalize( uVMatrix * vec4( sun_light_dir, 0 ) ).xyz;
 
-    vec3 sea_water_color_mixed = mix( sea_water_color, sea_water_color_cloudy, uCloudiness );
+    vec4 refracted = engamma( vec4( sea_base_color + diffuse( normal, lightdir, 80.0 ) * sea_water_color * 0.12, 1.0 ) ); 
 
-    vec4 refracted = engamma( vec4( sea_base_color + diffuse( normal, lightdir, 80.0 ) * sea_water_color_mixed * 0.12, 1.0 ) ); 
-
-    float fresnel = 1.0 - max( dot(-normal,-view), 0.0 );
-    fresnel = pow(fresnel,3.0) * 0.45;
+    float fresnel = 1.0 - max(dot(-normal,-view),0.0);
+    fresnel = pow(fresnel,3.0) * 0.65;
     
     vec4 color = mix( refracted, ibl_specular, fresnel );
 
     float atten = max( 1.0 - dot( dist, dist ) * 0.001, 0.0 );
 
-    color += engamma( vec4( sea_water_color_mixed * cached_height * 0.18 * atten, 1.0 ) );
+    color += engamma( vec4( sea_water_color * cached_height * 0.18 * atten, 1.0 ) );
 
     color += engamma( vec4( get_specular( normal, lightdir, -view, 100.0 ) ) );
    
