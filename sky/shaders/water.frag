@@ -19,7 +19,7 @@ const   vec3  sun_light_dir = normalize( vec3( 0.0, 1.0, 0.4 ) );  // radius of 
 
 const   vec3  sea_base_color  = vec3( 0.1,0.27,0.3 );
 const   vec3  sea_water_color = vec3( 0.8,0.9,0.6 );
-const   vec3  sea_water_color_cloudy = vec3( 0.5,0.55,0.4 );
+const   vec3  sea_water_color_cloudy = vec3( 0.2,0.225,0.15 );
 
 flat in float sea_speed;
 flat in float sea_choppiness;

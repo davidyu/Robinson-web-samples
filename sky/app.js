@@ -3638,10 +3638,10 @@ var Quad = /** @class */ (function (_super) {
             ];
             this.renderData.vertices = new Float32Array(vertices);
             var uvs = [
-                0.0, 0.0,
-                1.0, 0.0,
-                1.0, 1.0,
                 0.0, 1.0,
+                1.0, 1.0,
+                1.0, 0.0,
+                0.0, 0.0,
             ];
             this.renderData.textureCoords = new Float32Array(uvs);
             var vertexNormals = [
@@ -3743,6 +3743,7 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["WATER_SS_FRAG"] = 17] = "WATER_SS_FRAG";
     SHADERTYPE[SHADERTYPE["NOISE_WRITER_FRAG"] = 18] = "NOISE_WRITER_FRAG";
     SHADERTYPE[SHADERTYPE["VOLUME_VIEWER_FRAG"] = 19] = "VOLUME_VIEWER_FRAG";
+    SHADERTYPE[SHADERTYPE["POST_PROCESS_FRAG"] = 20] = "POST_PROCESS_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
@@ -3759,6 +3760,7 @@ var SHADER_PROGRAM;
     SHADER_PROGRAM[SHADER_PROGRAM["CUBE_SH"] = 9] = "CUBE_SH";
     SHADER_PROGRAM[SHADER_PROGRAM["NOISE_WRITER"] = 10] = "NOISE_WRITER";
     SHADER_PROGRAM[SHADER_PROGRAM["VOLUME_VIEWER"] = 11] = "VOLUME_VIEWER";
+    SHADER_PROGRAM[SHADER_PROGRAM["POST_PROCESS"] = 12] = "POST_PROCESS";
 })(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
@@ -3815,6 +3817,7 @@ var ShaderRepository = /** @class */ (function () {
         this.asyncLoadShader("water_screenspace.frag", SHADERTYPE.WATER_SS_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("noise_writer.frag", SHADERTYPE.NOISE_WRITER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("volume_viewer.frag", SHADERTYPE.VOLUME_VIEWER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("post-process.frag", SHADERTYPE.POST_PROCESS_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
     };
     ShaderRepository.prototype.asyncLoadShader = function (name, stype, loaded) {
         var req = new XMLHttpRequest();
@@ -3887,7 +3890,7 @@ var Renderer = /** @class */ (function () {
     function Renderer(viewportElement, sr, backgroundColor) {
         if (backgroundColor === void 0) { backgroundColor = new gml.Vec4(0, 0, 0, 1); }
         this.repo = sr;
-        var gl = viewportElement.getContext("webgl2");
+        var gl = viewportElement.getContext("webgl2", { antialias: true });
         gl.viewport(0, 0, viewportElement.width, viewportElement.height);
         this.viewportW = viewportElement.width;
         this.viewportH = viewportElement.height;
@@ -4001,6 +4004,14 @@ var Renderer = /** @class */ (function () {
         this.programData[SHADER_PROGRAM.VOLUME_VIEWER] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.VOLUME_VIEWER_FRAG].source);
         this.programData[SHADER_PROGRAM.VOLUME_VIEWER].program = volumeViewerProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.VOLUME_VIEWER);
+        var postProcessProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.POST_PROCESS_FRAG].source);
+        if (postProcessProgram == null) {
+            alert("post process compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.POST_PROCESS] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.POST_PROCESS_FRAG].source);
+        this.programData[SHADER_PROGRAM.POST_PROCESS].program = postProcessProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.POST_PROCESS);
         var cubeMapSHProgram = this.compileShaderProgram(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         if (cubeMapSHProgram == null) {
             alert("Cube map shader compilation failed. Please check the log for details.");
@@ -4068,6 +4079,8 @@ var Renderer = /** @class */ (function () {
         uniforms.uPerlinNoise = gl.getUniformLocation(program, "uPerlinNoise");
         uniforms.uSparseWorleyNoise = gl.getUniformLocation(program, "uSparseWorleyNoise");
         uniforms.uWorleyNoise = gl.getUniformLocation(program, "uWorleyNoise");
+        uniforms.uColor = gl.getUniformLocation(program, "screen_color");
+        uniforms.uDepth = gl.getUniformLocation(program, "screen_depth");
         uniforms.uMaterial = new ShaderMaterialProperties();
         uniforms.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
         uniforms.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
@@ -4161,6 +4174,24 @@ var Renderer = /** @class */ (function () {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environmentMap.cubeMapTexture);
         }
+        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
+    };
+    Renderer.prototype.renderPostProcessedImage = function (gl, color, depth) {
+        var fullscreen = new Quad();
+        fullscreen.rebuildRenderData(gl);
+        this.useProgram(gl, SHADER_PROGRAM.POST_PROCESS);
+        var shaderVariables = this.programData[this.currentProgram].uniforms;
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
+        gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.uniform1i(shaderVariables.uColor, 0);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, color);
+        gl.uniform1i(shaderVariables.uDepth, 1);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, depth);
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
@@ -4315,11 +4346,6 @@ var Renderer = /** @class */ (function () {
         gl.uniformMatrix4fv(shaderVariables.uModelView, false, gml.Mat4.identity().m);
         gl.uniformMatrix3fv(shaderVariables.uNormalModelView, false, gml.Mat3.identity().m);
         gl.uniformMatrix4fv(shaderVariables.uPerspective, false, gml.Mat4.identity().m);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.textureCoords, gl.STATIC_DRAW);
-        gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
         if (scene.environmentMap != null) {
             gl.uniform1i(shaderVariables.uEnvMap, 0); // tells GL to look at texture slot 0
             gl.activeTexture(gl.TEXTURE0);
@@ -4411,9 +4437,27 @@ var Renderer = /** @class */ (function () {
                 else {
                     mvStack.push(gml.Mat4.identity());
                 }
-                // 
-                // RENDER TO SCREEN
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                //
+                // RENDER TO POST-PROCESS FRAMEBUFFER
+                //
+                var postProcessColorTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, postProcessColorTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.viewportW, this.viewportH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                var postProcessDepthTexture = gl.createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, postProcessDepthTexture);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT16, this.viewportW, this.viewportH, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+                var postProcessFramebuffer = gl.createFramebuffer(); // renderbuffer for depth buffer in framebuffer
+                gl.bindFramebuffer(gl.FRAMEBUFFER, postProcessFramebuffer); // so we can create storage for the depthBuffer
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, postProcessColorTexture, 0);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, postProcessDepthTexture, 0);
                 gl.viewport(0, 0, this.viewportW, this.viewportH);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
                 // draw environment map
@@ -4431,6 +4475,14 @@ var Renderer = /** @class */ (function () {
                 this.renderScene(gl, scene, mvStack, PASS.STANDARD_FORWARD);
                 if (this.enableTracing)
                     console.timeEnd("render scene");
+                // 
+                // RENDER POST-PROCESSED IMAGE TO SCREEN
+                if (this.enableTracing)
+                    console.time("post processing");
+                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+                gl.viewport(0, 0, this.viewportW, this.viewportH);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                this.renderPostProcessedImage(gl, postProcessColorTexture, postProcessDepthTexture);
             }
         }
     };
@@ -4568,7 +4620,7 @@ var Scene = /** @class */ (function () {
         this.dynamicEnvironment = dynamicEnvironment;
         this.noiseVolume = noiseVolume;
         this.cloudiness = 0.25;
-        this.cloudSpeed = 1.5;
+        this.cloudSpeed = 2.3;
     }
     Scene.prototype.addRenderable = function (renderable) {
         this.renderables.push(renderable);
@@ -5103,7 +5155,7 @@ function StartSky() {
             var cloudinessSlider = document.getElementById("cloud-slider");
             var cloudSpeedSlider = document.getElementById("wind-slider");
             cloudinessSlider.value = (scene.cloudiness * 100).toString();
-            cloudSpeedSlider.value = (scene.cloudSpeed * 50).toString();
+            cloudSpeedSlider.value = (scene.cloudSpeed * 30).toString();
             updateAndDraw(performance.now());
             // screenspace ocean
             /*
