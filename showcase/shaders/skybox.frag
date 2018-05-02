@@ -1,13 +1,14 @@
+#version 300 es
+
 precision mediump float;
 
-varying vec3 vDirection;
+in vec3 vDirection;
 
 uniform samplerCube environment;
+uniform bool        proceduralSky;
 
-vec3 flipX( vec3 v ) {
-    return vec3( -v.x, v.y, v.z );
-}
+out vec4 fragColor;
 
 void main() {
-    gl_FragColor = textureCube( environment, vDirection );
+    fragColor = texture( environment, vDirection );
 }

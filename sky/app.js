@@ -11,6 +11,7 @@ var __extends = (this && this.__extends) || (function () {
 var Camera = /** @class */ (function () {
     function Camera(position, aim, up, right) {
         this.matrix = gml.makeLookAt(position, aim, up, right);
+        this.focalDistance = 0.025;
     }
     Object.defineProperty(Camera.prototype, "pos", {
         get: function () {
@@ -1477,6 +1478,7 @@ var gml;
     }(gml.Matrix));
     gml.Mat4 = Mat4;
     /**
+     * @param fov  the vertical field of view.
      * @returns a 4x4 matrix that transforms a point in a user-defined view frustum to a point in
      *          a unit cube centered at the origin (IE: camera space to homogenous clip space).
      *          The w-component of the output point is the negated z of the original point in camera
@@ -1516,14 +1518,14 @@ var gml;
      * is performed in this method so they need not be already normalized.
      */
     function makeLookAt(pos, aim, up, right) {
-        var x = right.normalized;
-        var y = up.normalized;
-        var z = aim.negate().normalized;
-        var lookAt = Mat4.fromRows(x, y, z, new gml.Vec4(0, 0, 0, 1));
+        right = right.normalized;
+        up = up.normalized;
+        var forward = aim.negate().normalized;
+        var lookAt = Mat4.fromRows(right, up, forward, new gml.Vec4(0, 0, 0, 1));
         var npos = pos.negate();
-        lookAt.tx = npos.dot(x);
-        lookAt.ty = npos.dot(y);
-        lookAt.tz = npos.dot(z);
+        lookAt.tx = npos.dot(right);
+        lookAt.ty = npos.dot(up);
+        lookAt.tz = npos.dot(forward);
         return lookAt;
     }
     gml.makeLookAt = makeLookAt;
@@ -3110,7 +3112,6 @@ var InfinitePlane = /** @class */ (function (_super) {
         var _this = _super.call(this) || this;
         _this.subdivs = subdivisions;
         _this.transform = gml.Mat4.identity();
-        _this.planesize = 10000; // Not quite infinite :) but very large.
         _this.layers = layers;
         if (rotation != null) {
             var m = gml.Mat4.identity();
@@ -3687,6 +3688,7 @@ var Sphere = /** @class */ (function (_super) {
     Sphere.prototype.rebuildRenderData = function (gl) {
         var vertices = [];
         var indices = [];
+        var uvs = [];
         if (this.renderData.dirty) {
             this.renderData.dirty = false;
             for (var j = 0; j < this.parallels; j++) {
@@ -3699,6 +3701,8 @@ var Sphere = /** @class */ (function (_super) {
                     vertices.push(x);
                     vertices.push(y);
                     vertices.push(z);
+                    uvs.push(Math.atan2(x, z) / (2 * Math.PI) + 0.5);
+                    uvs.push(y * 0.5 + 0.5);
                 }
             }
             for (var j = 0; j < this.parallels - 1; j++) {
@@ -3716,6 +3720,7 @@ var Sphere = /** @class */ (function (_super) {
             this.renderData.vertices = new Float32Array(vertices);
             this.renderData.normals = new Float32Array(vertices); // for a unit sphere located at 0,0,0, the normals are exactly the same as the vertices
             this.renderData.indices = new Uint32Array(indices);
+            this.renderData.textureCoords = new Uint32Array(uvs);
             this.renderData.rebuildBufferObjects(gl);
         }
     };
@@ -3744,6 +3749,7 @@ var SHADERTYPE;
     SHADERTYPE[SHADERTYPE["NOISE_WRITER_FRAG"] = 18] = "NOISE_WRITER_FRAG";
     SHADERTYPE[SHADERTYPE["VOLUME_VIEWER_FRAG"] = 19] = "VOLUME_VIEWER_FRAG";
     SHADERTYPE[SHADERTYPE["POST_PROCESS_FRAG"] = 20] = "POST_PROCESS_FRAG";
+    SHADERTYPE[SHADERTYPE["DEPTH_TEXTURE_FRAG"] = 21] = "DEPTH_TEXTURE_FRAG";
 })(SHADERTYPE || (SHADERTYPE = {}));
 ;
 var SHADER_PROGRAM;
@@ -3761,6 +3767,7 @@ var SHADER_PROGRAM;
     SHADER_PROGRAM[SHADER_PROGRAM["NOISE_WRITER"] = 10] = "NOISE_WRITER";
     SHADER_PROGRAM[SHADER_PROGRAM["VOLUME_VIEWER"] = 11] = "VOLUME_VIEWER";
     SHADER_PROGRAM[SHADER_PROGRAM["POST_PROCESS"] = 12] = "POST_PROCESS";
+    SHADER_PROGRAM[SHADER_PROGRAM["RENDER_DEPTH_TEXTURE"] = 13] = "RENDER_DEPTH_TEXTURE";
 })(SHADER_PROGRAM || (SHADER_PROGRAM = {}));
 ;
 var PASS;
@@ -3818,6 +3825,7 @@ var ShaderRepository = /** @class */ (function () {
         this.asyncLoadShader("noise_writer.frag", SHADERTYPE.NOISE_WRITER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("volume_viewer.frag", SHADERTYPE.VOLUME_VIEWER_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
         this.asyncLoadShader("post-process.frag", SHADERTYPE.POST_PROCESS_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
+        this.asyncLoadShader("depth-texture.frag", SHADERTYPE.DEPTH_TEXTURE_FRAG, function (stype, contents) { _this.shaderLoaded(stype, contents); });
     };
     ShaderRepository.prototype.asyncLoadShader = function (name, stype, loaded) {
         var req = new XMLHttpRequest();
@@ -4012,6 +4020,14 @@ var Renderer = /** @class */ (function () {
         this.programData[SHADER_PROGRAM.POST_PROCESS] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.POST_PROCESS_FRAG].source);
         this.programData[SHADER_PROGRAM.POST_PROCESS].program = postProcessProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.POST_PROCESS);
+        var depthTextureProgram = this.compileShaderProgram(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.DEPTH_TEXTURE_FRAG].source);
+        if (depthTextureProgram == null) {
+            alert("depth texture compilation failed. Please check the log for details.");
+            success = false;
+        }
+        this.programData[SHADER_PROGRAM.RENDER_DEPTH_TEXTURE] = new ShaderProgramData(sr.files[SHADERTYPE.SS_QUAD_VERT].source, sr.files[SHADERTYPE.DEPTH_TEXTURE_FRAG].source);
+        this.programData[SHADER_PROGRAM.RENDER_DEPTH_TEXTURE].program = depthTextureProgram;
+        this.cacheLitShaderProgramLocations(SHADER_PROGRAM.RENDER_DEPTH_TEXTURE);
         var cubeMapSHProgram = this.compileShaderProgram(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         if (cubeMapSHProgram == null) {
             alert("Cube map shader compilation failed. Please check the log for details.");
@@ -4020,6 +4036,7 @@ var Renderer = /** @class */ (function () {
         this.programData[SHADER_PROGRAM.CUBE_SH] = new ShaderProgramData(sr.files[SHADERTYPE.PASSTHROUGH_VERT].source, sr.files[SHADERTYPE.CUBE_SH_FRAG].source);
         this.programData[SHADER_PROGRAM.CUBE_SH].program = cubeMapSHProgram;
         this.cacheLitShaderProgramLocations(SHADER_PROGRAM.CUBE_SH);
+        this.visualizeDepthBuffer = false;
         {
             /*
             this.envMapSHTexture = gl.createTexture();
@@ -4071,7 +4088,6 @@ var Renderer = /** @class */ (function () {
         uniforms.uWireframe = gl.getUniformLocation(program, "uDrawWireframe");
         uniforms.uProcSky = gl.getUniformLocation(program, "proceduralSky");
         uniforms.uIrradianceMap = gl.getUniformLocation(program, "irradiance");
-        uniforms.uEnvironmentMipMaps = gl.getUniformLocation(program, "environmentMipMaps");
         uniforms.uTime = gl.getUniformLocation(program, "uTime");
         uniforms.uCloudiness = gl.getUniformLocation(program, "uCloudiness");
         uniforms.uCloudSpeed = gl.getUniformLocation(program, "uCloudSpeed");
@@ -4081,6 +4097,7 @@ var Renderer = /** @class */ (function () {
         uniforms.uWorleyNoise = gl.getUniformLocation(program, "uWorleyNoise");
         uniforms.uColor = gl.getUniformLocation(program, "screen_color");
         uniforms.uDepth = gl.getUniformLocation(program, "screen_depth");
+        uniforms.uFocus = gl.getUniformLocation(program, "focus");
         uniforms.uMaterial = new ShaderMaterialProperties();
         uniforms.uMaterial.ambient = gl.getUniformLocation(program, "mat.ambient");
         uniforms.uMaterial.diffuse = gl.getUniformLocation(program, "mat.diffuse");
@@ -4144,16 +4161,16 @@ var Renderer = /** @class */ (function () {
             });
         }
     };
-    Renderer.prototype.renderSceneEnvironment = function (gl, scene, mvStack, viewportW, viewportH, perspective) {
+    Renderer.prototype.renderSceneSkybox = function (gl, scene, mvStack, viewportW, viewportH, perspective) {
         if (perspective === void 0) { perspective = null; }
         if (perspective == null) {
-            perspective = gml.makePerspective(gml.fromDegrees(45), viewportW / viewportH, 0.1, 100.0);
+            perspective = gml.makePerspective(gml.fromDegrees(45), viewportW / viewportH, 0.1, 1000.0);
         }
         if (scene.environmentMap != null) {
             this.useProgram(gl, SHADER_PROGRAM.SKYBOX);
         }
         else {
-            this.useProgram(gl, SHADER_PROGRAM.SKY);
+            this.useProgram(gl, SHADER_PROGRAM.SKY); // this shader program automatically moves our quad near the far clip plane, so we don't need to transform it ourselves here
         }
         var shaderVariables = this.programData[this.currentProgram].uniforms;
         var fullscreen = new Quad();
@@ -4162,6 +4179,7 @@ var Renderer = /** @class */ (function () {
         gl.uniformMatrix4fv(shaderVariables.uInverseProjection, false, inverseProjectionMatrix.m);
         var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
         gl.uniformMatrix3fv(shaderVariables.uInverseView, false, inverseViewMatrix.m);
+        gl.uniformMatrix4fv(shaderVariables.uModelToWorld, false, fullscreen.transform.m);
         if (this.camera != null) {
             gl.uniform4fv(shaderVariables.uCameraPos, this.camera.matrix.translation.negate().v);
         }
@@ -4176,7 +4194,23 @@ var Renderer = /** @class */ (function () {
         }
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
-    Renderer.prototype.renderPostProcessedImage = function (gl, color, depth) {
+    Renderer.prototype.renderDepthBuffer = function (gl, depth, mvStack) {
+        var fullscreen = new Quad();
+        fullscreen.rebuildRenderData(gl);
+        this.useProgram(gl, SHADER_PROGRAM.RENDER_DEPTH_TEXTURE);
+        var shaderVariables = this.programData[this.currentProgram].uniforms;
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
+        gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(shaderVariables.uView, false, mvStack[mvStack.length - 1].m);
+        gl.uniform1i(shaderVariables.uDepth, 1);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, depth);
+        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
+    };
+    Renderer.prototype.renderPostProcessedImage = function (gl, color, depth, mvStack) {
         var fullscreen = new Quad();
         fullscreen.rebuildRenderData(gl);
         this.useProgram(gl, SHADER_PROGRAM.POST_PROCESS);
@@ -4186,17 +4220,21 @@ var Renderer = /** @class */ (function () {
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix4fv(shaderVariables.uView, false, mvStack[mvStack.length - 1].m);
         gl.uniform1i(shaderVariables.uColor, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, color);
         gl.uniform1i(shaderVariables.uDepth, 1);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, depth);
+        if (this.camera != null) {
+            gl.uniform1f(shaderVariables.uFocus, this.camera.focalDistance);
+        }
         gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
         var _this = this;
-        var perspective = gml.makePerspective(gml.fromDegrees(45), 640.0 / 480.0, 0.1, 1000.0);
+        var perspective = gml.makePerspective(gml.fromDegrees(45), this.viewportW / this.viewportH, 0.1, 1000.0);
         scene.renderables.forEach(function (p, i) {
             if (p.material instanceof BlinnPhongMaterial) {
                 _this.useProgram(gl, SHADER_PROGRAM.BLINN_PHONG);
@@ -4401,14 +4439,9 @@ var Renderer = /** @class */ (function () {
             // DRAW
             var scene = Scene.getActiveScene();
             if (scene) {
-                //
-                // SET UP ENVIRONMENT MAP
-                var cubeMapTexture = null;
-                if (scene.environmentMap != null && scene.environmentMap.loaded && scene.environmentMap.cubeMapTexture == null) {
-                }
                 // 
                 // GENERATE ENVIRONMENT MAP, IF NECESSARY
-                if (scene.hasEnvironment && scene.dynamicEnvironment) {
+                if (scene.hasEnvironment) {
                     if (this.enableTracing)
                         console.time("environment map");
                     if (scene.dynamicEnvironment) {
@@ -4432,6 +4465,7 @@ var Renderer = /** @class */ (function () {
                 }
                 var mvStack = [];
                 if (this.camera != null) {
+                    // THIS MIGHT BE WRONG...maybe we're not negating the z???
                     mvStack.push(this.camera.matrix);
                 }
                 else {
@@ -4454,22 +4488,22 @@ var Renderer = /** @class */ (function () {
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT16, this.viewportW, this.viewportH, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
-                var postProcessFramebuffer = gl.createFramebuffer(); // renderbuffer for depth buffer in framebuffer
-                gl.bindFramebuffer(gl.FRAMEBUFFER, postProcessFramebuffer); // so we can create storage for the depthBuffer
+                var postProcessFramebuffer = gl.createFramebuffer();
+                gl.bindFramebuffer(gl.FRAMEBUFFER, postProcessFramebuffer);
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, postProcessColorTexture, 0);
                 gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, postProcessDepthTexture, 0);
+                gl.renderbufferStorageMultisample(gl.RENDERBUFFER, 4, gl.RGBA, this.viewportW, this.viewportH);
                 gl.viewport(0, 0, this.viewportW, this.viewportH);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
                 // draw environment map
                 if (scene.hasEnvironment) {
                     if (this.enableTracing)
                         console.time("environment");
-                    this.renderSceneEnvironment(gl, scene, mvStack, this.viewportW, this.viewportH);
+                    this.renderSceneSkybox(gl, scene, mvStack, this.viewportW, this.viewportH);
                     if (this.enableTracing)
                         console.timeEnd("environment");
                 }
                 // draw scene
-                gl.clear(gl.DEPTH_BUFFER_BIT);
                 if (this.enableTracing)
                     console.time("render scene");
                 this.renderScene(gl, scene, mvStack, PASS.STANDARD_FORWARD);
@@ -4481,8 +4515,13 @@ var Renderer = /** @class */ (function () {
                     console.time("post processing");
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.viewport(0, 0, this.viewportW, this.viewportH);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                this.renderPostProcessedImage(gl, postProcessColorTexture, postProcessDepthTexture);
+                // for debugging, coppy depth texture...
+                if (this.visualizeDepthBuffer) {
+                    this.renderDepthBuffer(gl, postProcessDepthTexture, mvStack);
+                }
+                else {
+                    this.renderPostProcessedImage(gl, postProcessColorTexture, postProcessDepthTexture, mvStack);
+                }
             }
         }
     };
@@ -4581,7 +4620,7 @@ var CubeMap = /** @class */ (function () {
         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_POSITIVE_Z, this.faces[CUBEMAPTYPE.POS_Z]);
         this.bindCubeMapFace(gl, gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, this.faces[CUBEMAPTYPE.NEG_Z]);
         gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, 0);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
     };
     CubeMap.prototype.bindCubeMapFace = function (gl, face, image) {
         gl.texImage2D(face, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
@@ -4611,12 +4650,13 @@ var Scene = /** @class */ (function () {
     function Scene(environmentMap, irradianceMap, hasEnvironment, dynamicEnvironment, noiseVolume) {
         if (hasEnvironment === void 0) { hasEnvironment = false; }
         if (dynamicEnvironment === void 0) { dynamicEnvironment = false; }
+        if (noiseVolume === void 0) { noiseVolume = null; }
         this.renderables = [];
         this.lights = [];
         this.environmentMap = environmentMap;
         this.irradianceMap = irradianceMap;
         this.time = 0;
-        this.hasEnvironment = hasEnvironment;
+        this.hasEnvironment = hasEnvironment || this.environmentMap != null;
         this.dynamicEnvironment = dynamicEnvironment;
         this.noiseVolume = noiseVolume;
         this.cloudiness = 0.25;
@@ -4737,6 +4777,33 @@ var Scene = /** @class */ (function () {
         return this.activeScene;
     };
     return Scene;
+}());
+var Debugger = /** @class */ (function () {
+    function Debugger(renderer) {
+        var _this = this;
+        this.renderer = renderer;
+        this.allOptions = document.createElement("div");
+        this.allOptions.setAttribute("class", "options-container");
+        this.depthBufferOption = document.createElement("div");
+        this.depthBufferOption.setAttribute("class", "option");
+        var depthBufferLabel = document.createElement("label");
+        depthBufferLabel.innerText = "Depth Buffer";
+        this.depthBufferOption.appendChild(depthBufferLabel);
+        var depthBufferCheckbox = document.createElement("input");
+        depthBufferCheckbox.setAttribute("id", "visualize-depth-buffer");
+        depthBufferCheckbox.setAttribute("type", "checkbox");
+        depthBufferCheckbox.onchange = function (e) { _this.depthBufferCheckboxChanged(e); };
+        this.depthBufferOption.appendChild(depthBufferCheckbox);
+        this.allOptions.appendChild(this.depthBufferOption);
+    }
+    Debugger.prototype.depthBufferCheckboxChanged = function (e) {
+        this.renderer.visualizeDepthBuffer = e.target.checked;
+    };
+    Debugger.prototype.install = function () {
+        var container = document.getElementById("debugger");
+        container.appendChild(this.allOptions);
+    };
+    return Debugger;
 }());
 var verbose_editor_logging = false;
 var ShaderEditor = /** @class */ (function () {
@@ -4899,7 +4966,7 @@ var ShaderEditor = /** @class */ (function () {
         container.appendChild(this.shaderEditor);
     };
     ShaderEditor.prototype.prettifyEnum = function (input) {
-        var output = input.replace("_", " ");
+        var output = input.replace(/_/g, " ");
         output = output.toLowerCase();
         output = output.replace(/\b\w/g, function (l) { return l.toUpperCase(); });
         return output;
@@ -4911,6 +4978,7 @@ var SkyApp = /** @class */ (function () {
         var _this = this;
         this.renderer = new Renderer(params.vp, shaderRepo);
         this.editor = new ShaderEditor(this.renderer);
+        this.dbg = new Debugger(this.renderer);
         this.orbitCenter = params.orbitCenter;
         this.orbitDistance = params.orbitDistance;
         this.yaw = gml.fromDegrees(140);
@@ -4919,6 +4987,16 @@ var SkyApp = /** @class */ (function () {
         this.dirty = true;
         this.dragStart = new gml.Vec2(0, 0);
         this.lastMousePos = new gml.Vec2(0, 0);
+        {
+            var baseAim = new gml.Vec4(0, 0, -1, 0);
+            var rotY = gml.Mat4.rotateY(this.yaw);
+            var rotRight = rotY.transform(gml.Vec4.right);
+            var rotX = gml.Mat4.rotate(rotRight, this.pitch);
+            var rotAim = rotX.transform(rotY.transform(baseAim)).normalized;
+            var rotUp = rotRight.cross(rotAim);
+            var rotPos = this.orbitCenter.add(rotAim.negate().multiply(this.orbitDistance));
+            this.camera = new Camera(rotPos, rotAim, rotUp, rotRight);
+        }
         var options = document.getElementsByTagName("select");
         var frameLimiterOption = null;
         for (var i = 0; i < options.length; i++) {
@@ -4928,9 +5006,11 @@ var SkyApp = /** @class */ (function () {
         frameLimiterOption.onchange = changeFrameLimit;
         var cloudinessSlider = document.getElementById("cloud-slider");
         var cloudSpeedSlider = document.getElementById("wind-slider");
+        var focalDistanceSlider = document.getElementById("focal-distance");
         cloudinessSlider.oninput = changeCloudiness;
         cloudSpeedSlider.oninput = changeCloudSpeed;
         cloudSpeedSlider.onchange = changeFinished;
+        focalDistanceSlider.oninput = changeFocalDistance;
         var wireframeCheckbox = document.getElementById("water-wireframe");
         wireframeCheckbox.onchange = changeWireframe;
         var showFPSCheckbox = document.getElementById("debug-fps");
@@ -4998,6 +5078,12 @@ function changeCloudSpeed(e) {
     lastAdjusted = "cloudspeed";
     stoptime = true;
     scene.cloudSpeed = e.target.value / 30; // 1 to 3.33ish
+}
+function changeFocalDistance(e) {
+    lastAdjusted = "focaldist";
+    var f = e.target.value / 100;
+    // fudge for our app: transform from 0 to 1 to 0 to 0.3
+    app.camera.focalDistance = 0.3 * f;
 }
 function changeFinished(e) {
     if (lastAdjusted == "cloudspeed") {
@@ -5090,7 +5176,6 @@ function updateAndDraw(t) {
         app.renderer.update();
     }
     if ((!stoptime || app.dirty) && finishedDownloadingTexture) {
-        app.renderer.dirty = true;
         app.renderer.render();
     }
     app.dirty = false;
@@ -5112,6 +5197,7 @@ function StartSky() {
             app = new SkyApp(params, repo);
             var gl = app.renderer.context;
             app.editor.install();
+            app.dbg.install();
             noise = new Noise();
             // download two blob files
             var worley_req = new XMLHttpRequest();
@@ -5154,8 +5240,10 @@ function StartSky() {
             lastFrame = performance.now();
             var cloudinessSlider = document.getElementById("cloud-slider");
             var cloudSpeedSlider = document.getElementById("wind-slider");
+            var focalDistanceSlider = document.getElementById("focal-distance");
             cloudinessSlider.value = (scene.cloudiness * 100).toString();
             cloudSpeedSlider.value = (scene.cloudSpeed * 30).toString();
+            focalDistanceSlider.value = ((app.camera.focalDistance / 0.3) * 100).toString();
             updateAndDraw(performance.now());
             // screenspace ocean
             /*
