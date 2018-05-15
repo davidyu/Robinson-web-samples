@@ -1478,7 +1478,6 @@ var gml;
     }(gml.Matrix));
     gml.Mat4 = Mat4;
     /**
-     * @param fov  the vertical field of view.
      * @returns a 4x4 matrix that transforms a point in a user-defined view frustum to a point in
      *          a unit cube centered at the origin (IE: camera space to homogenous clip space).
      *          The w-component of the output point is the negated z of the original point in camera
@@ -1518,14 +1517,14 @@ var gml;
      * is performed in this method so they need not be already normalized.
      */
     function makeLookAt(pos, aim, up, right) {
-        right = right.normalized;
-        up = up.normalized;
-        var forward = aim.negate().normalized;
-        var lookAt = Mat4.fromRows(right, up, forward, new gml.Vec4(0, 0, 0, 1));
+        var x = right.normalized;
+        var y = up.normalized;
+        var z = aim.negate().normalized;
+        var lookAt = Mat4.fromRows(x, y, z, new gml.Vec4(0, 0, 0, 1));
         var npos = pos.negate();
-        lookAt.tx = npos.dot(right);
-        lookAt.ty = npos.dot(up);
-        lookAt.tz = npos.dot(forward);
+        lookAt.tx = npos.dot(x);
+        lookAt.ty = npos.dot(y);
+        lookAt.tz = npos.dot(z);
         return lookAt;
     }
     gml.makeLookAt = makeLookAt;
@@ -4055,6 +4054,11 @@ var Renderer = /** @class */ (function () {
             gl.framebufferRenderbuffer( gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, sb );
             */
         }
+        this.fullscreenQuad = new Quad();
+        this.fullscreenQuad.rebuildRenderData(gl);
+        this.postProcessColorTexture = gl.createTexture();
+        this.postProcessDepthTexture = gl.createTexture();
+        this.postProcessFramebuffer = gl.createFramebuffer();
     }
     Renderer.prototype.cacheLitShaderProgramLocations = function (sp) {
         var gl = this.context;
@@ -4173,52 +4177,46 @@ var Renderer = /** @class */ (function () {
             this.useProgram(gl, SHADER_PROGRAM.SKY); // this shader program automatically moves our quad near the far clip plane, so we don't need to transform it ourselves here
         }
         var shaderVariables = this.programData[this.currentProgram].uniforms;
-        var fullscreen = new Quad();
-        fullscreen.rebuildRenderData(gl);
         var inverseProjectionMatrix = perspective.invert();
         gl.uniformMatrix4fv(shaderVariables.uInverseProjection, false, inverseProjectionMatrix.m);
         var inverseViewMatrix = mvStack[mvStack.length - 1].invert().mat3;
         gl.uniformMatrix3fv(shaderVariables.uInverseView, false, inverseViewMatrix.m);
-        gl.uniformMatrix4fv(shaderVariables.uModelToWorld, false, fullscreen.transform.m);
+        gl.uniformMatrix4fv(shaderVariables.uModelToWorld, false, this.fullscreenQuad.transform.m);
         if (this.camera != null) {
             gl.uniform4fv(shaderVariables.uCameraPos, this.camera.matrix.translation.negate().v);
         }
         gl.uniform1f(shaderVariables.uTime, scene.time);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.fullscreenQuad.renderData.indexBuffer);
         if (this.currentProgram == SHADER_PROGRAM.SKYBOX) {
             gl.uniform1i(shaderVariables.uEnvMap, 0);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environmentMap.cubeMapTexture);
         }
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
+        gl.drawElements(gl.TRIANGLES, this.fullscreenQuad.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderDepthBuffer = function (gl, depth, mvStack) {
-        var fullscreen = new Quad();
-        fullscreen.rebuildRenderData(gl);
         this.useProgram(gl, SHADER_PROGRAM.RENDER_DEPTH_TEXTURE);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.fullscreenQuad.renderData.indexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexTexCoordBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
         gl.uniformMatrix4fv(shaderVariables.uView, false, mvStack[mvStack.length - 1].m);
         gl.uniform1i(shaderVariables.uDepth, 1);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, depth);
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
+        gl.drawElements(gl.TRIANGLES, this.fullscreenQuad.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderPostProcessedImage = function (gl, color, depth, mvStack) {
-        var fullscreen = new Quad();
-        fullscreen.rebuildRenderData(gl);
         this.useProgram(gl, SHADER_PROGRAM.POST_PROCESS);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.fullscreenQuad.renderData.indexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexTexCoordBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
         gl.uniformMatrix4fv(shaderVariables.uView, false, mvStack[mvStack.length - 1].m);
         gl.uniform1i(shaderVariables.uColor, 0);
@@ -4230,7 +4228,7 @@ var Renderer = /** @class */ (function () {
         if (this.camera != null) {
             gl.uniform1f(shaderVariables.uFocus, this.camera.focalDistance);
         }
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_INT, 0);
+        gl.drawElements(gl.TRIANGLES, this.fullscreenQuad.renderData.indices.length, gl.UNSIGNED_INT, 0);
     };
     Renderer.prototype.renderScene = function (gl, scene, mvStack, pass) {
         var _this = this;
@@ -4378,8 +4376,6 @@ var Renderer = /** @class */ (function () {
     };
     Renderer.prototype.renderIrradianceFromScene = function (gl, scene, pass) {
         this.useProgram(gl, SHADER_PROGRAM.CUBE_SH);
-        var fullscreen = new Quad();
-        fullscreen.rebuildRenderData(gl);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
         gl.uniformMatrix4fv(shaderVariables.uModelView, false, gml.Mat4.identity().m);
         gl.uniformMatrix3fv(shaderVariables.uNormalModelView, false, gml.Mat3.identity().m);
@@ -4389,23 +4385,21 @@ var Renderer = /** @class */ (function () {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_CUBE_MAP, scene.environmentMap.cubeMapTexture);
         }
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, this.fullscreenQuad.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
     };
     Renderer.prototype.renderFullScreenTexture = function (gl, texture) {
         // this.useProgram( gl, SHADER_PROGRAM.UNLIT );
-        var fullscreen = new Quad();
-        fullscreen.rebuildRenderData(gl);
         var shaderVariables = this.programData[this.currentProgram].uniforms;
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexBuffer);
         gl.vertexAttribPointer(shaderVariables.aVertexPosition, 3, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, fullscreen.renderData.vertexTexCoordBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, fullscreen.renderData.textureCoords, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.vertexTexCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.fullscreenQuad.renderData.textureCoords, gl.STATIC_DRAW);
         gl.vertexAttribPointer(shaderVariables.aVertexTexCoord, 2, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fullscreen.renderData.indexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.fullscreenQuad.renderData.indexBuffer);
         gl.uniform1i(shaderVariables.uMaterial.colorMap, 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.drawElements(gl.TRIANGLES, fullscreen.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, this.fullscreenQuad.renderData.indices.length, gl.UNSIGNED_SHORT, 0);
     };
     Renderer.prototype.renderIrradiance = function () {
         var gl = this.context;
@@ -4474,24 +4468,21 @@ var Renderer = /** @class */ (function () {
                 //
                 // RENDER TO POST-PROCESS FRAMEBUFFER
                 //
-                var postProcessColorTexture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, postProcessColorTexture);
+                gl.bindTexture(gl.TEXTURE_2D, this.postProcessColorTexture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.viewportW, this.viewportH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-                var postProcessDepthTexture = gl.createTexture();
-                gl.bindTexture(gl.TEXTURE_2D, postProcessDepthTexture);
+                gl.bindTexture(gl.TEXTURE_2D, this.postProcessDepthTexture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT16, this.viewportW, this.viewportH, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
-                var postProcessFramebuffer = gl.createFramebuffer();
-                gl.bindFramebuffer(gl.FRAMEBUFFER, postProcessFramebuffer);
-                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, postProcessColorTexture, 0);
-                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, postProcessDepthTexture, 0);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, this.postProcessFramebuffer);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.postProcessColorTexture, 0);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.postProcessDepthTexture, 0);
                 gl.viewport(0, 0, this.viewportW, this.viewportH);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
                 // draw environment map
@@ -4510,16 +4501,22 @@ var Renderer = /** @class */ (function () {
                     console.timeEnd("render scene");
                 // 
                 // RENDER POST-PROCESSED IMAGE TO SCREEN
-                if (this.enableTracing)
-                    console.time("post processing");
                 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
                 gl.viewport(0, 0, this.viewportW, this.viewportH);
                 // for debugging, coppy depth texture...
                 if (this.visualizeDepthBuffer) {
-                    this.renderDepthBuffer(gl, postProcessDepthTexture, mvStack);
+                    if (this.enableTracing)
+                        console.time("render depth buffer");
+                    this.renderDepthBuffer(gl, this.postProcessDepthTexture, mvStack);
+                    if (this.enableTracing)
+                        console.timeEnd("render depth buffer");
                 }
                 else {
-                    this.renderPostProcessedImage(gl, postProcessColorTexture, postProcessDepthTexture, mvStack);
+                    if (this.enableTracing)
+                        console.time("post processing");
+                    this.renderPostProcessedImage(gl, this.postProcessColorTexture, this.postProcessDepthTexture, mvStack);
+                    if (this.enableTracing)
+                        console.timeEnd("post processing");
                 }
             }
         }
@@ -4829,6 +4826,7 @@ var ShaderEditor = /** @class */ (function () {
         this.fragmentShaderEditor.setTheme("ace/theme/solarized_light");
         this.fragmentShaderEditor.session.setMode("ace/mode/glsl");
         this.fragmentShaderEditor.$blockScrolling = Infinity;
+        this.hiddenShaders = [];
         // create stylesheet dynamically
         // this should probably just be put in a CSS file somewhere so it's overrideable
         // but for now, since we really don't care about customizability of the editor, just
@@ -4847,6 +4845,9 @@ var ShaderEditor = /** @class */ (function () {
         stylesheet.insertRule(".shader-text     { border-left: 1px #ccc solid; width: 50%; height: 100%; margin: 0; padding: 0; }");
         stylesheet.insertRule(".shader-text-con { float: left; flex-grow: 1; display: flex; }");
     }
+    ShaderEditor.prototype.hideShader = function (program) {
+        this.hiddenShaders.push(program);
+    };
     ShaderEditor.prototype.rebuildSelectedShader = function (session) {
         console.assert(session == this.vertexShaderEditor.session || session == this.fragmentShaderEditor.assertion);
         var gl = this.renderer.context;
@@ -4926,9 +4927,14 @@ var ShaderEditor = /** @class */ (function () {
         this.fragmentShaderEditor.setValue(this.renderer.programData[0].frag, -1);
         this.vertexEditSessions = [];
         this.fragmentEditSessions = [];
+        this.visibleShaders = []; // rebuild this list each time
         var _loop_1 = function () {
             if (isNaN(programName)) {
+                // skip hidden shaders
                 var index_1 = parseInt(SHADER_PROGRAM[programName]);
+                if (this_1.hiddenShaders.indexOf(index_1) != -1)
+                    return "continue";
+                this_1.visibleShaders.push(index_1);
                 var vertexSession_1 = ace.createEditSession(this_1.renderer.programData[index_1].vert, "ace/mode/glsl");
                 vertexSession_1.on("change", function (e) {
                     _this.rebuildSelectedShader(vertexSession_1);
@@ -4986,6 +4992,15 @@ var ShowcaseApp = /** @class */ (function () {
         this.pitch = gml.fromDegrees(0);
         this.renderer.setCamera(this.camera);
         this.dirty = true;
+        this.editor.hideShader(SHADER_PROGRAM.DEBUG);
+        this.editor.hideShader(SHADER_PROGRAM.SKY);
+        this.editor.hideShader(SHADER_PROGRAM.WATER);
+        this.editor.hideShader(SHADER_PROGRAM.WATER_SCREENSPACE);
+        this.editor.hideShader(SHADER_PROGRAM.CUBE_SH);
+        this.editor.hideShader(SHADER_PROGRAM.NOISE_WRITER);
+        this.editor.hideShader(SHADER_PROGRAM.VOLUME_VIEWER);
+        this.editor.hideShader(SHADER_PROGRAM.POST_PROCESS);
+        this.editor.hideShader(SHADER_PROGRAM.RENDER_DEPTH_TEXTURE);
         // camera parameters - save camera distance from target
         // construct location along viewing sphere
         var fu = function () { _this.fixedUpdate(); };
