@@ -4096,9 +4096,7 @@ var Renderer = /** @class */ (function () {
         uniforms.uCloudiness = gl.getUniformLocation(program, "uCloudiness");
         uniforms.uCloudSpeed = gl.getUniformLocation(program, "uCloudSpeed");
         uniforms.uNoiseLayer = gl.getUniformLocation(program, "uNoiseLayer");
-        uniforms.uPerlinNoise = gl.getUniformLocation(program, "uPerlinNoise");
-        uniforms.uSparseWorleyNoise = gl.getUniformLocation(program, "uSparseWorleyNoise");
-        uniforms.uWorleyNoise = gl.getUniformLocation(program, "uWorleyNoise");
+        uniforms.uCombinedNoiseVolume = gl.getUniformLocation(program, "uCombinedNoiseVolume");
         uniforms.uColor = gl.getUniformLocation(program, "screen_color");
         uniforms.uDepth = gl.getUniformLocation(program, "screen_depth");
         uniforms.uFocus = gl.getUniformLocation(program, "focus");
@@ -4760,7 +4758,7 @@ var Scene = /** @class */ (function () {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeMapRT);
         if (this.noiseVolume != null) {
-            gl.uniform1i(variables.uPerlinNoise, 1);
+            gl.uniform1i(variables.uCombinedNoiseVolume, 1);
             gl.activeTexture(gl.TEXTURE1);
             gl.bindTexture(gl.TEXTURE_3D, this.noiseVolume);
         }
