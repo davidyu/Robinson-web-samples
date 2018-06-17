@@ -3898,6 +3898,8 @@ var Renderer = /** @class */ (function () {
         if (backgroundColor === void 0) { backgroundColor = new gml.Vec4(0, 0, 0, 1); }
         this.repo = sr;
         var gl = viewportElement.getContext("webgl2", { antialias: true });
+        if (!gl)
+            return;
         gl.viewport(0, 0, viewportElement.width, viewportElement.height);
         this.viewportW = viewportElement.width;
         this.viewportH = viewportElement.height;
@@ -4525,6 +4527,80 @@ var Renderer = /** @class */ (function () {
     return Renderer;
 }());
 ;
+/***
+ * A compiled program along with its uniforms and metadata about its sources
+ */
+var CompiledProgramData = /** @class */ (function () {
+    function CompiledProgramData(vs, fs) {
+        this.sourceVSFilename = vs;
+        this.sourceFSFilename = fs;
+        this.program = null;
+        this.uniforms = {};
+    }
+    return CompiledProgramData;
+}());
+var ShaderLibrary = /** @class */ (function () {
+    function ShaderLibrary() {
+        this.allShadersLoaded = null;
+        this.shaderLoaded = null;
+        this.outgoingRequests = [];
+    }
+    ShaderLibrary.prototype.loadShader = function (name) {
+        var _this = this;
+        var req = new XMLHttpRequest();
+        req.addEventListener("load", function (evt) {
+            _this.sources[name] = req.responseText;
+            if (_this.shaderLoaded != null) {
+                _this.shaderLoaded(_this, name, req.responseText);
+            }
+            // remove me from the outgoing request list
+            _this.outgoingRequests = _this.outgoingRequests.filter(function (r) { return r != req; });
+            if (_this.outgoingRequests.length == 0 && _this.allShadersLoaded != null) {
+                _this.allShadersLoaded(_this);
+            }
+        });
+        req.open("GET", "./shaders/" + name, true);
+        this.outgoingRequests.push(req);
+        req.send();
+    };
+    ShaderLibrary.prototype.compileProgram = function (gl, vsFilename, fsFilename, programName, suppressErrors) {
+        if (suppressErrors === void 0) { suppressErrors = false; }
+        if (gl) {
+            var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertexShader, vsFilename);
+            gl.compileShader(vertexShader);
+            if (!suppressErrors && !gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+                console.log("An error occurred compiling the vertex shader: " + gl.getShaderInfoLog(vertexShader));
+                return null;
+            }
+            var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragmentShader, fsFilename);
+            gl.compileShader(fragmentShader);
+            if (!suppressErrors && !gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+                console.log("An error occurred compiling the fragment shader: " + gl.getShaderInfoLog(fragmentShader));
+                return null;
+            }
+            // Create the shader program
+            var program = gl.createProgram();
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            // force aVertexPosition to be bound to 0 to avoid perf penalty
+            // gl.bindAttribLocation( program, 0, "aVertexPosition" );
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.log("Unable to initialize the shader program: " + gl.getProgramInfoLog(program));
+                console.log("Problematic vertex shader:\n" + vsFilename);
+                console.log("Problematic fragment shader:\n" + fsFilename);
+            }
+            var out = new CompiledProgramData(vsFilename, fsFilename);
+            out.program = program;
+            return out;
+        }
+        return null;
+    };
+    return ShaderLibrary;
+}());
+;
 //
 // light.ts
 // user editable light base interface
@@ -4921,6 +4997,8 @@ var ShaderEditor = /** @class */ (function () {
         var _this = this;
         var container = document.getElementById("shader-editor");
         this.selectedShaderIndex = 0;
+        if (this.renderer.context == null)
+            return;
         this.vertexShaderEditor.setValue(this.renderer.programData[0].vert, -1);
         this.fragmentShaderEditor.setValue(this.renderer.programData[0].frag, -1);
         this.vertexEditSessions = [];
@@ -5209,6 +5287,11 @@ function StartSky() {
         var shaderRepo = new ShaderRepository(function (repo) {
             app = new SkyApp(params, repo);
             var gl = app.renderer.context;
+            if (gl == null) {
+                var label = document.getElementById("nosupport");
+                label.style.visibility = "visible";
+                return;
+            }
             app.editor.install();
             app.dbg.install();
             noise = new Noise();
